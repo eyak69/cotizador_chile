@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotizador Inteligente IA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Cotizador <span class="gradient-text">Inteligente</span> IA</h1>
+            <p>Sube tu póliza o solicitud anterior y deja que la IA haga el trabajo.</p>
+        </header>
+
+        <main>
+            <section class="upload-section" id="drop-area">
+                <div class="icon-cloud">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                </div>
+                <h3>Arrastra y suelta tu PDF aquí</h3>
+                <p>o haz clic para seleccionar un archivo</p>
+                <input type="file" id="fileElem" accept="application/pdf" style="display:none">
+            </section>
+
+            <button id="processBtn" class="btn-primary" disabled>
+                <span>Procesar Cotización</span>
+                <div class="spinner" id="spinner"></div>
+            </button>
+
+            <section id="result-section" class="result-card hidden">
+                <div class="card-header">
+                    <h2>Resultado del Análisis</h2>
+                    <span class="badge success">Procesado con Éxito</span>
+                </div>
+
+                <div class="summary-header">
+                    <div class="info-group">
+                        <h3>👤 Asegurado</h3>
+                        <p id="res-asegurado">-</p>
+                    </div>
+                    <div class="info-group">
+                        <h3>🚗 Vehículo</h3>
+                        <p id="res-vehiculo">-</p>
+                    </div>
+                </div>
+
+                <div id="quotes-container" class="quotes-grid">
+                    <!-- Las cotizaciones se insertarán aquí dinámicamente -->
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" id="downloadBtn">Descargar JSON</button>
+                    <button class="btn-outline" onclick="location.reload()">Nueva Cotización</button>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>

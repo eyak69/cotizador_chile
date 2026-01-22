@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: cotizador_app
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASS=root
+      - DB_NAME=cotizador_db
+      - DB_DIALECT=mysql
+    # Cargar variables desde archivo .env (claves API)
+    env_file:
+      - .env
+      # Las claves de API deben pasarse aquí o en un archivo .env referenciado
+      # - GEMINI_API_KEY=${GEMINI_API_KEY} 
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      # Persistencia de uploads en el HOST (Windows/Linux)
+      - ./uploads:/app/uploads
+      # Opcional: Persistir logs
+      - ./logs:/app/logs
+    depends_on:
+      - db
+    networks:
+      - cotizador_net
+    # Comando modificado para esperar un poco a que la DB arranque si es la primera vez
+    command: >
+      sh -c "npm run init && npm run start"
+
+  db:
+    image: mysql:8.0
+    container_name: cotizador_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: cotizador_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - cotizador_net
+    # Comando para usar autenticación nativa (evita errores con clientes viejos)
+    command: --default-authentication-plugin=mysql_native_password
+
+volumes:
+  mysql_data:
+
+
+networks:
+  cotizador_net:
+    driver: bridge

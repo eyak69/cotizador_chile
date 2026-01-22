@@ -1,0 +1,6 @@
+# Aprendizajes del Proyecto
+
+- **Persistencia de Datos**: Siempre se debe agregar datos por medio de herramientas (scripts como `seed_prompts.js` o migraciones) para que quede documentado y se pueda recuperar en caso de reinicio de la base de datos.
+- **Diferencias Visuales en Docker**: Las fuentes "system-ui" varían drásticamente entre Windows y Linux (Docker). Para consistencia visual, siempre define fuentes web explícitas (e.g., 'Outfit', 'Roboto') en el CSS global (`:root` o `body`), evitando depender de las fuentes del sistema operativo.
+- **Docker en Monorepos**: Es CRÍTICO usar `**/node_modules` en `.dockerignore`. Si usas solo `node_modules`, las carpetas anidadas (ej: `frontend/node_modules`) se copiarán al contenedor, llevando binarios de Windows a Linux y rompiendo el build silenciosamente.
+- **Conflictos Legacy vs SPA**: Al migrar o coexistir con aplicaciones antiguas en Express, NUNCA uses `app.use(express.static('public'))` globalmente si esa carpeta contiene un `index.html` viejo. Express servirá ese archivo antes que tu aplicación React, ocultándola por completo.
