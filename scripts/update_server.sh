@@ -32,6 +32,6 @@ docker compose -f $COMPOSE_FILE up -d
 echo "🧹 Limpiando imágenes antiguas..."
 docker image prune -f
 
-echo.
+echo ""
 echo "✅ ¡Actualización completada!"
 echo "   La aplicación está corriendo en el puerto 80 (o el definido en el YAML)."
