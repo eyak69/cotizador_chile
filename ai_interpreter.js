@@ -35,7 +35,7 @@ async function interpretQuoteData(filePath, originalFileName = "", config = {}) 
       console.log("--> Usando Prompt Específico de Empresa seleccionado.");
     } else {
       // Fallback: Cargar todas si no se especificó una
-      const { Empresa } = require('./models/mysql_models');
+      const { Empresa, CorrectionRule } = require('./models/mysql_models');
       const empresas = await Empresa.findAll();
 
       if (empresas.length > 0) {
@@ -45,10 +45,38 @@ async function interpretQuoteData(filePath, originalFileName = "", config = {}) 
       }
     }
 
+    // --- LOGICA DE INYECCIÓN DE REGLAS APRENDIDAS (FEEDBACK LOOP) ---
+    // Si tenemos empresa específica (ya sea por config o por detección previa que debamos pasar en config, 
+    // pero por ahora cargaremos TODAS las reglas si no es específico, o lo ideal es filtrar).
+    // Para simplificar: cargaremos TODAS las reglas de corrección agrupadas por empresa.
+
+    let learningContext = "";
+    try {
+      const { CorrectionRule, Empresa } = require('./models/mysql_models');
+      const allRules = await CorrectionRule.findAll({ include: [Empresa] });
+
+      if (allRules.length > 0) {
+        const rulesText = allRules.map(r =>
+          `- Para ${r.Empresa ? r.Empresa.nombre : 'Cualquier Empresa'}: Si ves "${r.valor_incorrecto}" en el campo "${r.campo}", CORRÍGELO a "${r.valor_correcto}".`
+        ).join("\n");
+
+        learningContext = `\n\nATENCIÓN - APRENDIZAJE DE ERRORES PREVIOS (Override):
+El usuario ha corregido manualmente errores anteriores. APLICA ESTAS CORRECCIONES SIEMPRE:
+${rulesText}
+---------------------------------------------------`;
+        console.log(`🧠 Se inyectaron ${allRules.length} reglas de aprendizaje al prompt.`);
+      }
+    } catch (errRules) {
+      console.warn("⚠️ Error cargando reglas de aprendizaje:", errRules.message);
+    }
+    // ------------------------------------------------------------------    
+
     const prompt = `Contexto: Actúa como un analista de seguros experto en la estructura de documentos de aseguradoras en Chile (SURA, MAPFRE, HDI, etc.). Tu tarea es procesar el texto extraído (OCR) de una cotización de vehículo motorizado y normalizar los datos.
 
 INSTRUCCIONES ESPECÍFICAS POR EMPRESA (Prioridad Máxima):
+INSTRUCCIONES ESPECÍFICAS POR EMPRESA (Prioridad Máxima):
 ${reglasEmpresas}
+${learningContext}
 
 
 
@@ -116,6 +144,16 @@ IMPORTANTE: Responde ÚNICAMENTE con el objeto JSON válido. NO incluyas introdu
     }
 
     const response = await result.response;
+
+    // Safety check: Verificar si hay candidatos válidos antes de llamar a text()
+    if (!response.candidates || response.candidates.length === 0 || !response.candidates[0].content) {
+      console.warn("⚠️ ALERTA IA: La respuesta fue bloqueada o está vacía (posible Safety Filter).");
+      if (response.promptFeedback) {
+        console.warn("Feedback Bloqueo:", JSON.stringify(response.promptFeedback));
+      }
+      throw new Error("Respuesta de IA bloqueada por filtros de seguridad o vacía.");
+    }
+
     const text = response.text();
 
     if (config.debugMode) {

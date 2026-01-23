@@ -7,6 +7,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import SimCardDownloadIcon from '@mui/icons-material/SimCardDownload';
+import DescriptionIcon from '@mui/icons-material/Description';
 import axios from 'axios';
 
 const HistoryPanel = () => {
@@ -101,6 +102,18 @@ const HistoryPanel = () => {
                                             sx={{ mx: 1 }}
                                         >
                                             <SimCardDownloadIcon />
+                                        </IconButton>
+                                    </Tooltip>
+
+                                    <Tooltip title="Descargar Word">
+                                        <IconButton
+                                            component="a"
+                                            href={`/api/quotes/${row.id}/word`}
+                                            target="_blank"
+                                            download={`Presupuesto_${row.id}.docx`}
+                                            sx={{ mx: 1, color: '#2b579a' }}
+                                        >
+                                            <DescriptionIcon />
                                         </IconButton>
                                     </Tooltip>
 

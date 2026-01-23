@@ -169,6 +169,47 @@ const SettingsPanel = () => {
                 Configuración del Sistema
             </Typography>
 
+            {/* SECCIÓN PLANTILLA WORD */}
+            <Paper elevation={3} sx={{ padding: 3, marginBottom: 4, border: '1px solid #ddd' }}>
+                <Typography variant="h6" gutterBottom color="primary">Plantilla de Presupuesto (Word)</Typography>
+                <Typography variant="body2" gutterBottom>
+                    Sube aquí tu archivo .docx base. Variables: <code>+++cliente+++</code>, <code>+++vehiculo+++</code> y bucle <code>+++detalles+++</code>.
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 2 }}>
+                    <input
+                        accept=".docx"
+                        style={{ display: 'none' }}
+                        id="raised-button-file-template"
+                        type="file"
+                        onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                                const formData = new FormData();
+                                formData.append('template', file);
+                                axios.post('/api/config/template', formData)
+                                    .then(() => alert("Plantilla actualizada con éxito!"))
+                                    .catch(err => alert("Error al subir plantilla: " + err.message));
+                            }
+                        }}
+                    />
+                    <label htmlFor="raised-button-file-template">
+                        <Button variant="outlined" component="span" startIcon={<SaveIcon />}>
+                            Subir Plantilla .DOCX
+                        </Button>
+                    </label>
+
+                    <Button
+                        variant="text"
+                        color="primary"
+                        href="/api/config/template/sample"
+                        download="Plantilla_Ejemplo_Cotizador.docx"
+                        sx={{ ml: 2 }}
+                    >
+                        Descargar Plantilla Base (Ejemplo)
+                    </Button>
+                </Box>
+            </Paper>
+
             {/* SECCIÓN AI */}
             <Box sx={{ mb: 6, p: 3, border: '1px solid #444', borderRadius: 2 }}>
                 <Typography variant="h6" gutterBottom color="primary">Control de Inteligencia Artificial</Typography>

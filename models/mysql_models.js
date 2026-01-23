@@ -76,8 +76,31 @@ const Parametro = sequelize.define('Parametro', {
   }
 }, { tableName: 'parametros' });
 
+const CorrectionRule = sequelize.define('CorrectionRule', {
+  campo: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  valor_incorrecto: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  valor_correcto: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  empresa_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true // Puede ser null si es una regla global (futuro), pero por ahora linkeada a empresa
+  }
+}, { tableName: 'correction_rules' });
+
 // Relación 1 a N
 Cotizacion.hasMany(DetalleCotizacion, { as: 'detalles' });
 DetalleCotizacion.belongsTo(Cotizacion);
 
-module.exports = { Cotizacion, DetalleCotizacion, Empresa, Parametro };
+// Relación CorrectionRule
+Empresa.hasMany(CorrectionRule, { foreignKey: 'empresa_id' });
+CorrectionRule.belongsTo(Empresa, { foreignKey: 'empresa_id' });
+
+module.exports = { Cotizacion, DetalleCotizacion, Empresa, Parametro, CorrectionRule };

@@ -25,9 +25,9 @@ const upload = multer({ dest: path.join(__dirname, 'uploads', 'temp') });
 // Conexión a Base de Datos
 // Conexión a Base de Datos (MySQL)
 const { connectDB, sequelize } = require('./database');
-const { Cotizacion, DetalleCotizacion, Empresa, Parametro } = require('./models/mysql_models');
+const { Cotizacion, DetalleCotizacion, Empresa, Parametro, CorrectionRule } = require('./models/mysql_models');
 const { Op } = require('sequelize'); // Importar Op para consultas de fechas
-connectDB();
+connectDB(); // Inicializar conexión y sincronización de modelos
 
 // Asegurar directorios
 const finalUploadDir = path.join(__dirname, 'uploads', 'final');
@@ -341,10 +341,10 @@ app.post('/api/empresas', async (req, res) => {
             return res.status(400).json({ error: "Nombre y reglas son requeridos." });
         }
         // Fix: Permitir 0 como valor válido usando undefined check o nullish coalescing
-        const nuevaEmpresa = await Empresa.create({ 
-            nombre, 
-            prompt_reglas, 
-            paginas_procesamiento: paginas_procesamiento !== undefined ? paginas_procesamiento : 2 
+        const nuevaEmpresa = await Empresa.create({
+            nombre,
+            prompt_reglas,
+            paginas_procesamiento: paginas_procesamiento !== undefined ? paginas_procesamiento : 2
         });
         res.json(nuevaEmpresa);
     } catch (error) {
@@ -438,6 +438,96 @@ app.delete('/api/quotes/:id', async (req, res) => {
     } catch (error) {
         console.error("Error deleting quote:", error);
         res.status(500).json({ error: "Error al eliminar la cotización." });
+    }
+});
+
+// --- EDICIÓN Y APRENDIZAJE DE DETALLES ---
+app.put('/api/quote-details/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { plan, prima_uf3, prima_uf5, prima_uf10, taller_marca, rc_monto, observaciones, learn } = req.body;
+
+        const detalle = await DetalleCotizacion.findByPk(id);
+        if (!detalle) return res.status(404).json({ error: "Detalle no encontrado." });
+
+        // Guardar valores anteriores para "Aprender"
+        const previousValues = {
+            plan: detalle.plan,
+            prima_uf3: detalle.prima_uf3,
+            prima_uf5: detalle.prima_uf5,
+            prima_uf10: detalle.prima_uf10,
+            taller_marca: detalle.taller_marca,
+            rc_monto: detalle.rc_monto
+            // Otros campos si fueran necesarios
+        };
+
+        // Actualizar Detalle
+        if (plan !== undefined) detalle.plan = plan;
+        if (prima_uf3 !== undefined) detalle.prima_uf3 = prima_uf3;
+        if (prima_uf5 !== undefined) detalle.prima_uf5 = prima_uf5;
+        if (prima_uf10 !== undefined) detalle.prima_uf10 = prima_uf10;
+        if (taller_marca !== undefined) detalle.taller_marca = taller_marca;
+        if (rc_monto !== undefined) detalle.rc_monto = rc_monto;
+        if (observaciones !== undefined) detalle.observaciones = observaciones;
+
+        await detalle.save();
+
+        // LÓGICA DE APRENDIZAJE (FEEDBACK LOOP)
+        if (learn && detalle.empresa_id) {
+            console.log(`🧠 APRENDIZAJE ACTIVADO para Empresa ID: ${detalle.empresa_id}`);
+
+            // Comparar y guardar reglas
+            const fieldsToCheck = [
+                { key: 'plan', dbField: 'plan' }, // key en body, dbField en model
+                { key: 'prima_uf3', dbField: 'primas.uf_3' }, // dbField como lo ve la IA (JSON structure hint)
+                { key: 'prima_uf5', dbField: 'primas.uf_5' },
+                { key: 'prima_uf10', dbField: 'primas.uf_10' },
+                { key: 'taller_marca', dbField: 'caracteristicas.taller_marca' },
+                { key: 'rc_monto', dbField: 'caracteristicas.rc' }
+            ];
+
+            const rulesToCreate = [];
+
+            fieldsToCheck.forEach(field => {
+                const newValue = req.body[field.key];
+                const oldValue = previousValues[field.key];
+
+                // Normalizar valores para comparación (evitar falso positivo '54' vs 54 o null vs '')
+                const normalize = (val) => {
+                    if (val === null || val === undefined) return '';
+                    return String(val).trim();
+                };
+
+                const valIncorrecto = normalize(oldValue);
+                const valCorrecto = normalize(newValue);
+
+                // Solo aprender si hay diferencia real y el valor no estaba vacío originalmente 
+                // (no queremos aprender que "nada" es incorrecto, salvo casos muy específicos, 
+                // pero por seguridad pedimos que haya un valor previo incorrecto para corregir)
+                if (valIncorrecto !== valCorrecto && valIncorrecto !== '' && valCorrecto !== '') {
+                    console.log(`  -> Detectada corrección en '${field.key}': '${valIncorrecto}' => '${valCorrecto}'`);
+                    rulesToCreate.push({
+                        empresa_id: detalle.empresa_id,
+                        campo: field.dbField,
+                        valor_incorrecto: valIncorrecto,
+                        valor_correcto: valCorrecto
+                    });
+                }
+            });
+
+            if (rulesToCreate.length > 0) {
+                await CorrectionRule.bulkCreate(rulesToCreate);
+                console.log(`  ✅ ${rulesToCreate.length} reglas de corrección aprendidas.`);
+            } else {
+                console.log("  ℹ️ No se detectaron cambios sustanciales para aprender (o faltaban valores previos).");
+            }
+        }
+
+        res.json({ message: "Detalle actualizado.", detalle });
+
+    } catch (error) {
+        console.error("Error updating quote detail:", error);
+        res.status(500).json({ error: "Error al actualizar detalle." });
     }
 });
 
@@ -605,13 +695,181 @@ process.on('exit', (code) => {
     console.log(`Process exited with code: ${code}`);
 });
 
-process.on('SIGINT', () => {
-    console.log('Received SIGINT. Exiting...');
-    process.exit(0);
-});
+// SIGINT handler removed for debugging
 
 process.on('beforeExit', (code) => {
     console.log('Process beforeExit code:', code);
+});
+
+
+
+// --- LOGICA DE GENERACIÓN WORD ---
+const createReport = require('docx-templates').default;
+
+// Endpoint para subir plantilla
+app.post('/api/config/template', upload.single('template'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No se subió ningún archivo.' });
+    }
+    // Mover a una ubicación fija para uso posterior
+    const templateDir = path.join(__dirname, 'uploads', 'templates');
+    if (!fs.existsSync(templateDir)) fs.mkdirSync(templateDir, { recursive: true });
+
+    const templatePath = path.join(templateDir, 'plantilla_presupuesto.docx');
+    fs.renameSync(req.file.path, templatePath);
+    res.json({ message: 'Plantilla de presupuesto actualizada con éxito.' });
+});
+
+// Endpoint para descargar plantilla de ejemplo
+app.get('/api/config/template/sample', (req, res) => {
+    // Intentar servir la nueva plantilla con instrucciones
+    let templatePath = path.join(__dirname, 'uploads', 'doc', 'plantilla_ejemplo.docx');
+
+    console.log("[DEBUG] Checking template path:", templatePath);
+    if (!fs.existsSync(templatePath)) {
+        console.log("[DEBUG] Path not found, trying fallback...");
+        // Fallback a la antigua si no existe la nueva
+        templatePath = path.join(__dirname, 'uploads', 'templates', 'ejemplo_base.docx');
+    }
+
+    if (!fs.existsSync(templatePath)) {
+        console.log("[DEBUG] Fallback failed too:", templatePath);
+        return res.status(404).json({ error: 'La plantilla de ejemplo no se ha generado.' });
+    }
+
+    res.download(templatePath, 'Plantilla_Ejemplo_Cotizador.docx');
+});
+
+// Endpoint para descargar Word generado
+app.get('/api/quotes/:id/word', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const quote = await Cotizacion.findByPk(id, {
+            include: [{ model: DetalleCotizacion, as: 'detalles' }]
+        });
+
+        if (!quote) return res.status(404).json({ error: 'Cotización no encontrada' });
+
+        // Primero intentar con la plantilla personalizada
+        let templatePath = path.join(__dirname, 'uploads', 'templates', 'plantilla_presupuesto.docx');
+
+        // Si no existe, usar la plantilla de ejemplo por defecto
+        if (!fs.existsSync(templatePath)) {
+            console.log("No custom template found, using default example.");
+            templatePath = path.join(__dirname, 'uploads', 'doc', 'plantilla_ejemplo.docx');
+        }
+
+        if (!fs.existsSync(templatePath)) {
+            // Último intento: buscar la vieja por si acaso
+            const oldPath = path.join(__dirname, 'uploads', 'templates', 'ejemplo_base.docx');
+            if (fs.existsSync(oldPath)) {
+                templatePath = oldPath;
+            } else {
+                return res.status(404).json({ error: 'No hay plantilla configurada ni por defecto.' });
+            }
+        }
+
+        const templateBuffer = fs.readFileSync(templatePath);
+
+        // Preparar datos para la plantilla
+        const data = {
+            cliente: quote.asegurado || 'Cliente',
+            fecha: new Date(quote.createdAt).toLocaleDateString(),
+            vehiculo: quote.vehiculo || 'Vehículo',
+            detalles: quote.detalles.map(d => ({
+                compania: d.compania,
+                plan: d.plan,
+                prima_uf3: d.prima_uf3 || '-',
+                prima_uf5: d.prima_uf5 || '-',
+                prima_uf10: d.prima_uf10 || '-',
+                taller: d.taller_marca || '-',
+                rc: d.rc_monto || '-'
+            }))
+        };
+
+        const buffer = await createReport({
+            template: templateBuffer,
+            data: data,
+            cmdDelimiter: '+++' // Usaremos +++variable+++ en el Word
+        });
+
+        // Guardar archivo temporalmente como solicitó el usuario
+        const tempFileName = `Presupuesto_${id}.docx`;
+        const tempFilePath = path.join(__dirname, 'uploads', 'temp', tempFileName);
+
+        // Asegurar que exista carpeta temp (ya debería, pero por seguridad)
+        const tempDir = path.dirname(tempFilePath);
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+        fs.writeFileSync(tempFilePath, Buffer.from(buffer));
+        console.log(`Word generado y guardado en temp: ${tempFilePath}`);
+
+        // Descargar archivo físico
+        res.download(tempFilePath, tempFileName, (err) => {
+            if (err) {
+                console.error("Error en descarga de archivo:", err);
+                // Opcional: limpiar archivo si falla, o dejarlo para debug
+            } else {
+                // Opcional: limpiar archivo después de descarga exitosa
+                // fs.unlinkSync(tempFilePath); 
+                // El usuario pidió "usar el /temp para generar", a veces prefieren persistencia momentánea. Lo dejamos.
+            }
+        });
+
+    } catch (error) {
+        console.error("Error generando Word:", error);
+        res.status(500).json({ error: "Error al generar el documento Word." });
+    }
+});
+
+// Endpoint para descargar Word generado (Single Detail)
+app.get('/api/quote-details/:id/word', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const detalle = await DetalleCotizacion.findByPk(id, {
+            include: [{ model: Cotizacion }] // Necesitamos datos del cliente/vehículo
+        });
+
+        if (!detalle) return res.status(404).json({ error: 'Detalle no encontrado' });
+        const quote = detalle.Cotizacion;
+
+        const templatePath = path.join(__dirname, 'uploads', 'templates', 'plantilla_presupuesto.docx');
+        if (!fs.existsSync(templatePath)) {
+            return res.status(404).json({ error: 'No hay plantilla configurada.' });
+        }
+
+        const templateBuffer = fs.readFileSync(templatePath);
+
+        // Preparar datos (Reutilizamos estructura de array para que la plantilla única sirva igual)
+        const data = {
+            cliente: quote.asegurado || 'Cliente',
+            fecha: new Date(quote.createdAt).toLocaleDateString(),
+            vehiculo: quote.vehiculo || 'Vehículo',
+            detalles: [{
+                compania: detalle.compania,
+                plan: detalle.plan,
+                prima_uf3: detalle.prima_uf3 || '-',
+                prima_uf5: detalle.prima_uf5 || '-',
+                prima_uf10: detalle.prima_uf10 || '-',
+                taller: detalle.taller_marca || '-',
+                rc: detalle.rc_monto || '-'
+            }]
+        };
+
+        const buffer = await createReport({
+            template: templateBuffer,
+            data: data,
+            cmdDelimiter: '+++'
+        });
+
+        res.setHeader('Content-Disposition', `attachment; filename=Presupuesto_${detalle.compania}_${id}.docx`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.send(Buffer.from(buffer));
+
+    } catch (error) {
+        console.error("Error generando Word Detalle:", error);
+        res.status(500).json({ error: "Error al generar documento." });
+    }
 });
 
 
