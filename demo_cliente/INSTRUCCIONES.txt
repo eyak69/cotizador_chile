@@ -1,0 +1,35 @@
+========================================================================
+   GUÍA RÁPIDA DE INSTALACIÓN - COTIZADOR INTELIGENTE
+========================================================================
+
+Para ejecutar esta aplicación en su computadora, solo necesita seguir estos 2 pasos:
+
+PASO 1: INSTALAR DOCKER DESKTOP
+------------------------------------------------------------------------
+La aplicación utiliza tecnología de contenedores para funcionar sin necesidad de instalar bases de datos ni configuraciones complejas.
+
+1. Descargue e instale "Docker Desktop for Windows":
+   https://www.docker.com/products/docker-desktop/
+
+2. Una vez instalado, ábralo y espere a que el icono de la ballena en la barra de tareas deje de moverse (Diga "Docker Engine running").
+
+PASO 2: EJECUTAR EL COTIZADOR
+------------------------------------------------------------------------
+1. Abra el archivo "claves.env" con el Bloc de Notas y, si es necesario, ingrese sus claves de API (OpenAI/Google). Guarde el archivo.
+
+2. Haga DOBLE CLIC en el archivo:
+   
+   >> iniciar_app.bat <<
+
+   Esto descargará automáticamente la última versión del programa y abrirá la pantalla negra de la consola. No cierre esa ventana.
+
+3. Abra su navegador (Chrome, Edge) y entre a:
+   http://localhost:3000
+
+¡Listo!
+
+------------------------------------------------------------------------
+PROBLEMAS COMUNES
+------------------------------------------------------------------------
+- Si dice "Docker no está corriendo": Asegúrese de que Docker Desktop esté abierto.
+- Si dice "Puerto ocupado": Verifique que no tenga abierta otra instancia.

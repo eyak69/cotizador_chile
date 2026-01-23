@@ -340,7 +340,12 @@ app.post('/api/empresas', async (req, res) => {
         if (!nombre || !prompt_reglas) {
             return res.status(400).json({ error: "Nombre y reglas son requeridos." });
         }
-        const nuevaEmpresa = await Empresa.create({ nombre, prompt_reglas, paginas_procesamiento: paginas_procesamiento || 2 });
+        // Fix: Permitir 0 como valor válido usando undefined check o nullish coalescing
+        const nuevaEmpresa = await Empresa.create({ 
+            nombre, 
+            prompt_reglas, 
+            paginas_procesamiento: paginas_procesamiento !== undefined ? paginas_procesamiento : 2 
+        });
         res.json(nuevaEmpresa);
     } catch (error) {
         console.error("Error creating empresa:", error);
@@ -358,7 +363,8 @@ app.put('/api/empresas/:id', async (req, res) => {
 
         if (nombre) empresa.nombre = nombre;
         if (prompt_reglas) empresa.prompt_reglas = prompt_reglas;
-        if (req.body.paginas_procesamiento) empresa.paginas_procesamiento = req.body.paginas_procesamiento;
+        // Fix: Permitir actualizar a 0 checking undefined
+        if (req.body.paginas_procesamiento !== undefined) empresa.paginas_procesamiento = req.body.paginas_procesamiento;
 
         await empresa.save();
         res.json(empresa);

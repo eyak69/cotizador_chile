@@ -101,7 +101,7 @@ const CompanyManager = () => {
                                 <TableRow key={emp.id}>
                                     <TableCell>{emp.id}</TableCell>
                                     <TableCell sx={{ fontWeight: 'bold' }}>{emp.nombre}</TableCell>
-                                    <TableCell>{emp.paginas_procesamiento || 2}</TableCell>
+                                    <TableCell>{emp.paginas_procesamiento ?? 2}</TableCell>
                                     <TableCell sx={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {emp.prompt_reglas}
                                     </TableCell>

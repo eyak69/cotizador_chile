@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  app:
+    # Descarga la imagen lista para usar desde la nube
+    image: cfanton/cotizador-chile:latest
+    container_name: cotizador_app_cliente
+    restart: always
+    ports:
+      # La aplicación correrá en http://localhost:3000
+      - "3000:3000"
+    environment:
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASS=root
+      - DB_NAME=cotizador_db
+      - DB_DIALECT=mysql
+    env_file:
+      - claves.env
+    volumes:
+      # Aquí se guardarán los archivos subidos (en la carpeta del cliente)
+      - ./archivos_subidos:/app/uploads
+    depends_on:
+      - db
+    command: >
+      sh -c "npm run init && npm run start"
+
+  db:
+    image: mysql:8.0
+    container_name: cotizador_db_cliente
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: cotizador_db
+    ports:
+      # Puerto interno de base de datos (3308 para evitar conflictos con otros)
+      - "3308:3306"
+    volumes:
+      - datos_mysql:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+
+volumes:
+  datos_mysql:
