@@ -1,11 +1,8 @@
-const { Empresa } = require('../../models/mysql_models');
+const AdminService = require('../services/AdminService');
 
-/**
- * Obtener todas las empresas
- */
 exports.getEmpresas = async (req, res) => {
     try {
-        const empresas = await Empresa.findAll();
+        const empresas = await AdminService.getAllEmpresas();
         res.json(empresas);
     } catch (error) {
         console.error("Error fetching empresas:", error);
@@ -13,20 +10,13 @@ exports.getEmpresas = async (req, res) => {
     }
 };
 
-/**
- * Crear nueva empresa
- */
 exports.createEmpresa = async (req, res) => {
     try {
-        const { nombre, prompt_reglas, paginas_procesamiento } = req.body;
+        const { nombre, prompt_reglas } = req.body;
         if (!nombre || !prompt_reglas) {
             return res.status(400).json({ error: "Nombre y reglas son requeridos." });
         }
-        const nuevaEmpresa = await Empresa.create({
-            nombre,
-            prompt_reglas,
-            paginas_procesamiento: paginas_procesamiento !== undefined ? paginas_procesamiento : 2
-        });
+        const nuevaEmpresa = await AdminService.createEmpresa(req.body);
         res.json(nuevaEmpresa);
     } catch (error) {
         console.error("Error creating empresa:", error);
@@ -34,42 +24,26 @@ exports.createEmpresa = async (req, res) => {
     }
 };
 
-/**
- * Actualizar empresa
- */
 exports.updateEmpresa = async (req, res) => {
     try {
         const { id } = req.params;
-        const { nombre, prompt_reglas } = req.body;
-        const empresa = await Empresa.findByPk(id);
-
-        if (!empresa) return res.status(404).json({ error: "Empresa no encontrada." });
-
-        if (nombre) empresa.nombre = nombre;
-        if (prompt_reglas) empresa.prompt_reglas = prompt_reglas;
-        if (req.body.paginas_procesamiento !== undefined) empresa.paginas_procesamiento = req.body.paginas_procesamiento;
-
-        await empresa.save();
+        const empresa = await AdminService.updateEmpresa(id, req.body);
         res.json(empresa);
     } catch (error) {
         console.error("Error updating empresa:", error);
-        res.status(500).json({ error: "Error al actualizar empresa." });
+        const status = error.message === "Empresa no encontrada" ? 404 : 500;
+        res.status(status).json({ error: error.message || "Error al actualizar empresa." });
     }
 };
 
-/**
- * Eliminar empresa
- */
 exports.deleteEmpresa = async (req, res) => {
     try {
         const { id } = req.params;
-        const empresa = await Empresa.findByPk(id);
-        if (!empresa) return res.status(404).json({ error: "Empresa no encontrada." });
-
-        await empresa.destroy();
+        await AdminService.deleteEmpresa(id);
         res.json({ message: "Empresa eliminada correctamente." });
     } catch (error) {
         console.error("Error deleting empresa:", error);
-        res.status(500).json({ error: "Error al eliminar empresa." });
+        const status = error.message === "Empresa no encontrada" ? 404 : 500;
+        res.status(status).json({ error: error.message || "Error al eliminar empresa." });
     }
 };

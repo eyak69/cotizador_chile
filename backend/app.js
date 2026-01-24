@@ -47,10 +47,9 @@ if (fs.existsSync(frontendDist)) {
     console.warn("⚠️ Frontend build NOT found.");
 }
 
+const errorHandler = require('./middleware/errorHandler');
+
 // Global Error Handler
-app.use((err, req, res, next) => {
-    console.error("UNKNOWN SERVER ERROR:", err);
-    res.status(500).json({ error: 'Error interno del servidor', details: err.message });
-});
+app.use(errorHandler);
 
 module.exports = app;
