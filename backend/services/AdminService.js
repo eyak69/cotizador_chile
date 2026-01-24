@@ -76,7 +76,10 @@ class AdminService {
         if (!fs.existsSync(templateDir)) fs.mkdirSync(templateDir, { recursive: true });
 
         const templatePath = path.join(templateDir, 'plantilla_presupuesto.docx');
-        fs.renameSync(filePath, templatePath);
+        // fs.renameSync falla entre dispositivos (EXDEV) en Docker si movemos de un volumen a una carpeta del contenedor.
+        // Usamos copy + unlink para evitar esto.
+        fs.copyFileSync(filePath, templatePath);
+        fs.unlinkSync(filePath);
         return { message: 'Plantilla de presupuesto actualizada con éxito.' };
     }
 
