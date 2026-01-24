@@ -7,12 +7,12 @@ services:
     container_name: cotizador_app_cliente
     restart: always
     ports:
-      # La aplicación correrá en http://localhost:3000
-      - "3000:3000"
+      # La aplicación correrá en http://localhost:3001
+      - "3001:3000"
     environment:
       - DB_HOST=db
-      - DB_USER=root
-      - DB_PASS=root
+      - DB_USER=cotizador_user
+      - DB_PASS=cotizador_pass
       - DB_NAME=cotizador_db
       - DB_DIALECT=mysql
     env_file:
@@ -30,13 +30,19 @@ services:
     container_name: cotizador_db_cliente
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      # Usuario Root para emergencias
+      MYSQL_ROOT_PASSWORD: root_super_secret
+      # Usuario App (Coincide con init.sql y app env)
       MYSQL_DATABASE: cotizador_db
+      MYSQL_USER: cotizador_user
+      MYSQL_PASSWORD: cotizador_pass
     ports:
-      # Puerto interno de base de datos (3308 para evitar conflictos con otros)
-      - "3308:3306"
+      # Puerto interno de base de datos (3307)
+      - "3307:3306"
     volumes:
       - datos_mysql:/var/lib/mysql
+      # Script de inicialización (Crea DB y Users)
+      - ./mysql_init:/docker-entrypoint-initdb.d
     command: --default-authentication-plugin=mysql_native_password
 
 volumes:

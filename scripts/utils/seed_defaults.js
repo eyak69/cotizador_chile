@@ -1,6 +1,6 @@
 require('dotenv').config();
-const { connectDB, sequelize } = require('./database');
-const { Empresa, Parametro } = require('./models/mysql_models');
+const { connectDB, sequelize } = require('../../database');
+const { Empresa, Parametro } = require('../../models/mysql_models');
 
 // --- DATOS POR DEFECTO ---
 
