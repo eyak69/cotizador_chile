@@ -1,0 +1,9 @@
+Esta función requiere que el usuario suba un archivo .docx real. 
+Como soy una IA de texto, no puedo generar un .docx binario válido desde cero aquí.
+Sin embargo, crearé el código para que el usuario pueda SUBIR su propia plantilla.
+
+Instrucciones para la plantilla que deberá crear el usuario:
+1. Abrir Word.
+2. Escribir "Presupuesto para: +++cliente+++"
+3. Insertar una tabla.
+4. En la fila de datos usar: +++detalles.compania+++ | +++detalles.plan+++ | +++detalles.prima_uf10+++

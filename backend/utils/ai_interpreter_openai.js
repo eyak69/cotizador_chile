@@ -24,7 +24,7 @@ async function interpretQuoteData(filePath, originalFileName = "", config = {}) 
 
     // 2. Preparar el Prompt (Actualizado con instrucciones Críticas del Usuario)
     // Obtener reglas de empresas desde la BD
-    const { Empresa } = require('./models/mysql_models');
+    const { Empresa } = require('../../models/mysql_models');
     const empresas = await Empresa.findAll();
     let reglasEmpresas = "";
 

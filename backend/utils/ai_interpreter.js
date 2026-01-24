@@ -1,6 +1,6 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require('fs');
-const { Empresa } = require('./models/mysql_models');
+const { Empresa } = require('../../models/mysql_models');
 
 // Función auxiliar para convertir archivo a GenerativePart
 function fileToGenerativePart(path, mimeType) {
@@ -35,7 +35,7 @@ async function interpretQuoteData(filePath, originalFileName = "", config = {}) 
       console.log("--> Usando Prompt Específico de Empresa seleccionado.");
     } else {
       // Fallback: Cargar todas si no se especificó una
-      const { Empresa, CorrectionRule } = require('./models/mysql_models');
+      const { Empresa, CorrectionRule } = require('../../models/mysql_models');
       const empresas = await Empresa.findAll();
 
       if (empresas.length > 0) {
@@ -52,7 +52,7 @@ async function interpretQuoteData(filePath, originalFileName = "", config = {}) 
 
     let learningContext = "";
     try {
-      const { CorrectionRule, Empresa } = require('./models/mysql_models');
+      const { CorrectionRule, Empresa } = require('../../models/mysql_models');
       const allRules = await CorrectionRule.findAll({ include: [Empresa] });
 
       if (allRules.length > 0) {
