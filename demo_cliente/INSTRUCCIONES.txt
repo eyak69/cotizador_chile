@@ -15,21 +15,25 @@ La aplicación utiliza tecnología de contenedores para funcionar sin necesidad 
 
 PASO 2: EJECUTAR EL COTIZADOR
 ------------------------------------------------------------------------
-1. Abra el archivo "claves.env" con el Bloc de Notas y, si es necesario, ingrese sus claves de API (OpenAI/Google). Guarde el archivo.
+1. Abra el archivo "claves.env" y configure sus claves si es necesario.
 
+EN WINDOWS:
 2. Haga DOBLE CLIC en el archivo:
-   
    >> iniciar_app.bat <<
 
-   Esto descargará automáticamente la última versión del programa y abrirá la pantalla negra de la consola. No cierre esa ventana.
+EN MAC / LINUX:
+2. Abra la Terminal, ubíquese en la carpeta (cd demo_cliente) y ejecute este comando para dar permisos (solo la primera vez):
+   chmod +x iniciar_app.sh
 
-3. Abra su navegador (Chrome, Edge) y entre a:
-   http://localhost:3000
+3. Luego, inicie el sistema:
+   ./iniciar_app.sh
 
-¡Listo!
+Esto descargará la última versión y abrirá el navegador automáticamente.
+Para detenerlo, presione Enter en la ventana de terminal/consola.
 
 ------------------------------------------------------------------------
 PROBLEMAS COMUNES
 ------------------------------------------------------------------------
 - Si dice "Docker no está corriendo": Asegúrese de que Docker Desktop esté abierto.
-- Si dice "Puerto ocupado": Verifique que no tenga abierta otra instancia.
+- MAC M1/M2/M3: Docker Desktop en Mac soporta automáticamente la emulación. Si nota lentitud, asegúrese de tener activada la opción "Use Rosetta for x86/amd64 emulation on Apple Silicon" en la configuración de Docker.
+

@@ -15,11 +15,13 @@ services:
       - DB_PASS=cotizador_pass
       - DB_NAME=cotizador_db
       - DB_DIALECT=mysql
+      - DB_PORT=3306
     env_file:
       - claves.env
     volumes:
-      # Aquí se guardarán los archivos subidos (en la carpeta del cliente)
-      - ./archivos_subidos:/app/uploads
+      # Montamos solo subcarpetas específicas para no ocultar "templates" y "doc" de la imagen
+      - ./archivos_subidos/temp:/app/uploads/temp
+      - ./archivos_subidos/final:/app/uploads/final
     depends_on:
       - db
     command: >
@@ -43,7 +45,7 @@ services:
       - datos_mysql:/var/lib/mysql
       # Script de inicialización (Crea DB y Users)
       - ./mysql_init:/docker-entrypoint-initdb.d
-    command: --default-authentication-plugin=mysql_native_password
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 
 volumes:
   datos_mysql:
