@@ -4,6 +4,8 @@ npm-debug.log
 .git
 .env
 uploads
+!uploads/templates
+!uploads/doc
 .gemini
 dist
 build
