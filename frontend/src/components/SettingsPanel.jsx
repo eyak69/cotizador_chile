@@ -118,7 +118,7 @@ const SettingsPanel = () => {
             // para soportar un endpoint genérico de ABM.
             // Por ahora, asumiremos que implementaremos POST /api/parameters para crear/editar
 
-            await axios.post('/api/parameters', editingParam);
+            await axios.post('/api/config/parameters', editingParam);
 
             setToast({ open: true, msg: 'Parámetro guardado', severity: 'success' });
             setOpenDialog(false);
@@ -132,7 +132,7 @@ const SettingsPanel = () => {
     const handleDeleteParam = async (key) => {
         if (!window.confirm(`¿Eliminar parámetro ${key}?`)) return;
         try {
-            await axios.delete(`/api/parameters/${key}`);
+            await axios.delete(`/api/config/parameters/${key}`);
             setToast({ open: true, msg: 'Parámetro eliminado', severity: 'success' });
             fetchParameters();
         } catch (error) {
