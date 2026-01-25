@@ -21,19 +21,26 @@ exports.processUpload = async (req, res) => {
         // 4. Llamada IA
         const quoteData = await QuoteProcessingService.processWithAI(pathForAI, req.file.originalname, aiConfig, selectedEmpresa);
 
-        // Limpieza Temporales (DESACTIVADO PARA DEBUG: No borrar archivo optimizado)
-        // if (wasOptimized && fs.existsSync(optimizedPath)) {
-        //     try { fs.unlinkSync(optimizedPath); } catch (e) { }
-        // }
-
-        // Mover archivo final (incluso si IA falla, podríamos querer guardarlo? No, lógica original guarda. Haremos igual)
-        // La lógica original guardaba ANTES de checkear error.
-
+        // Mover archivo final para historial (Siempre)
         const loteId = req.body.loteId;
         const finalFileName = QuoteProcessingService.moveFileToFinal(req.file.path, req.file.originalname, loteId);
 
-        // Clean original upload
-        // try { fs.unlinkSync(req.file.path); } catch (e) { }
+        // Limpieza Temporales Condicional (Según DEBUG)
+        if (!aiConfig.debugMode) {
+            console.log("🧹 DEBUG=false: Limpiando archivos temporales...");
+
+            // Borrar PDF optimizado si se creó
+            if (wasOptimized && fs.existsSync(optimizedPath)) {
+                try { fs.unlinkSync(optimizedPath); } catch (e) { console.error("Error borrando opt:", e); }
+            }
+
+            // Borrar PDF original subido (ya se movió copia a /final)
+            if (req.file && fs.existsSync(req.file.path)) {
+                try { fs.unlinkSync(req.file.path); } catch (e) { console.error("Error borrando temp:", e); }
+            }
+        } else {
+            console.log("🐞 DEBUG=true: Archivos temporales conservados en /uploads/temp/");
+        }
 
 
         // 5. Validar Errores IA
