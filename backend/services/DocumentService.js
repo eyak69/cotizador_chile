@@ -68,6 +68,8 @@ class DocumentService {
             { header: 'Prima 3UF', key: 'prima_uf3', width: 15 },
             { header: 'Prima 5UF', key: 'prima_uf5', width: 15 },
             { header: 'Prima 10UF', key: 'prima_uf10', width: 15 },
+            { header: 'Taller Marca', key: 'taller', width: 15 },
+            { header: 'Reposición', key: 'reposicion', width: 15 },
             { header: 'RC', key: 'rc', width: 20 },
             { header: 'Observación', key: 'obs', width: 50 }
         ];
@@ -81,8 +83,10 @@ class DocumentService {
                 prima_uf3: d.prima_uf3,
                 prima_uf5: d.prima_uf5,
                 prima_uf10: d.prima_uf10,
+                taller: d.taller_marca,
+                reposicion: d.reposicion_meses,
                 rc: d.rc_monto,
-                obs: d.observacion
+                obs: d.observaciones
             });
         });
 

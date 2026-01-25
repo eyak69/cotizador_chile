@@ -35,7 +35,7 @@ function Row({ quote, onUpdate }) {
         const wsData = [
             ["Fecha", new Date(quote.createdAt).toLocaleDateString(), "Asegurado", quote.asegurado || "", "Vehículo", quote.vehiculo || ""],
             [],
-            ["Compañía", "Plan", "UF 3", "UF 5", "UF 10", "Taller Marca", "RC", "Observaciones"],
+            ["Compañía", "Plan", "UF 3", "UF 5", "UF 10", "Taller Marca", "Reposición", "RC", "Observaciones"],
         ];
 
         if (quote.detalles) {
@@ -47,6 +47,7 @@ function Row({ quote, onUpdate }) {
                     d.prima_uf5,
                     d.prima_uf10,
                     d.taller_marca,
+                    d.reposicion_meses,
                     d.rc_monto,
                     d.observaciones
                 ]);
@@ -55,7 +56,7 @@ function Row({ quote, onUpdate }) {
 
         const ws = XLSX.utils.aoa_to_sheet(wsData);
         const wscols = [
-            { wch: 15 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 50 }
+            { wch: 15 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 50 }
         ];
         ws['!cols'] = wscols;
 
