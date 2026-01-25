@@ -31,11 +31,11 @@ echo      SISTEMA LISTO!
 echo ========================================================
 echo.
 echo La aplicacion esta disponible en:
-echo    http://localhost:3000
+echo    http://localhost:3001
 echo.
 echo Abriendo navegador...
 timeout /t 3 >nul
-start http://localhost:3000
+start http://localhost:3001
 
 echo.
 echo Presione cualquier tecla solo si desea DETENER el sistema.

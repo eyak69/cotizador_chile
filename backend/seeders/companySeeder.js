@@ -1,4 +1,4 @@
-const { Empresa } = require('../models/mysql_models');
+const { Empresa } = require('../../models/mysql_models');
 
 const companyPrompts = [
     {
