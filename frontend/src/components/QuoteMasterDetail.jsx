@@ -30,39 +30,12 @@ function Row({ quote, onUpdate }) {
 
     const downloadExcel = (e) => {
         e.stopPropagation();
-
-        const wb = XLSX.utils.book_new();
-        const wsData = [
-            ["Fecha", new Date(quote.createdAt).toLocaleDateString(), "Asegurado", quote.asegurado || "", "Vehículo", quote.vehiculo || ""],
-            [],
-            ["Compañía", "Plan", "UF 3", "UF 5", "UF 10", "Taller Marca", "Reposición", "RC", "Observaciones"],
-        ];
-
-        if (quote.detalles) {
-            quote.detalles.forEach(d => {
-                wsData.push([
-                    d.compania,
-                    d.plan,
-                    d.prima_uf3,
-                    d.prima_uf5,
-                    d.prima_uf10,
-                    d.taller_marca,
-                    d.reposicion_meses,
-                    d.rc_monto,
-                    d.observaciones
-                ]);
-            });
+        if (quote.id) {
+            // Usar el generador del servidor para consistencia con Historial
+            window.location.href = `/api/quotes/${quote.id}/excel`;
+        } else {
+            alert("Esta cotización aún no tiene ID asignado. Intente recargar.");
         }
-
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        const wscols = [
-            { wch: 15 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 50 }
-        ];
-        ws['!cols'] = wscols;
-
-        XLSX.utils.book_append_sheet(wb, ws, "Cotización");
-        const safeName = (quote.asegurado || "Cotizacion").replace(/[^a-z0-9]/gi, '_').substring(0, 30);
-        XLSX.writeFile(wb, `${safeName}.xlsx`);
     };
 
     const toggleEdit = (detalle) => {
