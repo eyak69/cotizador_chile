@@ -58,9 +58,9 @@ const Empresa = sequelize.define('Empresa', {
     allowNull: false
   },
   paginas_procesamiento: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 2
+    type: DataTypes.STRING,
+    allowNull: true,
+    defaultValue: "2"
   }
 }, { tableName: 'empresas' });
 

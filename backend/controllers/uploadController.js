@@ -21,10 +21,10 @@ exports.processUpload = async (req, res) => {
         // 4. Llamada IA
         const quoteData = await QuoteProcessingService.processWithAI(pathForAI, req.file.originalname, aiConfig, selectedEmpresa);
 
-        // Limpieza Temporales
-        if (wasOptimized && fs.existsSync(optimizedPath)) {
-            try { fs.unlinkSync(optimizedPath); } catch (e) { }
-        }
+        // Limpieza Temporales (DESACTIVADO PARA DEBUG: No borrar archivo optimizado)
+        // if (wasOptimized && fs.existsSync(optimizedPath)) {
+        //     try { fs.unlinkSync(optimizedPath); } catch (e) { }
+        // }
 
         // Mover archivo final (incluso si IA falla, podríamos querer guardarlo? No, lógica original guarda. Haremos igual)
         // La lógica original guardaba ANTES de checkear error.
@@ -33,7 +33,7 @@ exports.processUpload = async (req, res) => {
         const finalFileName = QuoteProcessingService.moveFileToFinal(req.file.path, req.file.originalname, loteId);
 
         // Clean original upload
-        try { fs.unlinkSync(req.file.path); } catch (e) { }
+        // try { fs.unlinkSync(req.file.path); } catch (e) { }
 
 
         // 5. Validar Errores IA

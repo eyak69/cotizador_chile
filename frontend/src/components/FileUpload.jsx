@@ -23,15 +23,8 @@ const FileUpload = ({ onQuoteProcessed }) => {
             .then(res => setCompanies(res.data))
             .catch(err => console.error("Error cargando empresas:", err));
 
-        // Cargar estado DEBUG (buscamos en la lista de params o un endpoint específico)
-        axios.get('/api/parametros')
-            .then(res => {
-                const debugParam = res.data.find(p => p.parametro === 'DEBUG');
-                if (debugParam && debugParam.valor === 'true') {
-                    setShowDebug(true);
-                }
-            })
-            .catch(err => console.error("Error cargando config debug:", err));
+        // Cargar estado DEBUG (Opcional, desactivado para evitar 404 si no existe endpoint)
+        // axios.get('/api/parametros')...
     }, []);
 
     const calculateMD5 = (file) => {

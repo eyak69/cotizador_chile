@@ -88,6 +88,7 @@ const HistoryRow = ({ row, onDelete, onDownloadExcel, onViewPdf }) => {
                                         <TableCell>Prima 10UF</TableCell>
                                         <TableCell>RC</TableCell>
                                         <TableCell>Taller</TableCell>
+                                        <TableCell>Reposición</TableCell>
                                         <TableCell>Observaciones</TableCell>
                                         <TableCell align="center">PDF</TableCell>
                                     </TableRow>
@@ -102,6 +103,7 @@ const HistoryRow = ({ row, onDelete, onDownloadExcel, onViewPdf }) => {
                                             <TableCell>{detalleRow.prima_uf10 || '-'}</TableCell>
                                             <TableCell>{detalleRow.rc_monto || '-'}</TableCell>
                                             <TableCell>{detalleRow.taller_marca || '-'}</TableCell>
+                                            <TableCell>{detalleRow.reposicion_meses || '-'}</TableCell>
                                             <TableCell>{detalleRow.observaciones || '-'}</TableCell>
                                             <TableCell align="center">
                                                 <Tooltip title="Ver Respaldo PDF">

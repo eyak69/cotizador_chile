@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import {
     Box, Button, Paper, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, IconButton, Typography, Dialog, DialogTitle,
-    DialogContent, DialogActions, TextField, Snackbar, Alert
+    DialogContent, DialogActions, TextField, Snackbar, Alert, Tooltip, InputAdornment
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import InfoIcon from '@mui/icons-material/Info';
 import axios from 'axios';
 
 const CompanyManager = () => {
     const [empresas, setEmpresas] = useState([]);
     const [openDialog, setOpenDialog] = useState(false);
-    const [currentEmpresa, setCurrentEmpresa] = useState({ nombre: '', prompt_reglas: '', paginas_procesamiento: 2 });
+    const [currentEmpresa, setCurrentEmpresa] = useState({ nombre: '', prompt_reglas: '', paginas_procesamiento: "2" });
     const [isEditing, setIsEditing] = useState(false);
     const [toast, setToast] = useState({ open: false, msg: '', severity: 'success' });
 
@@ -66,7 +67,7 @@ const CompanyManager = () => {
     };
 
     const openNew = () => {
-        setCurrentEmpresa({ nombre: '', prompt_reglas: '', paginas_procesamiento: 2 });
+        setCurrentEmpresa({ nombre: '', prompt_reglas: '', paginas_procesamiento: "2" });
         setIsEditing(false);
         setOpenDialog(true);
     };
@@ -139,17 +140,41 @@ const CompanyManager = () => {
                             onChange={(e) => setCurrentEmpresa({ ...currentEmpresa, prompt_reglas: e.target.value })}
                             helperText="Escribe aquí las instrucciones específicas para la IA (Reglas de Oro, Conversión, etc.)"
                         />
-                        <TextField
-                            margin="dense"
-                            label="Páginas a procesar"
-                            type="number"
-                            fullWidth
-                            variant="outlined"
-                            value={currentEmpresa.paginas_procesamiento ?? 2}
-                            onChange={(e) => setCurrentEmpresa({ ...currentEmpresa, paginas_procesamiento: parseInt(e.target.value) })}
-                            helperText="Cantidad de primeras páginas a enviar a la IA (0 = Infinito, Default: 2)"
-                            sx={{ mt: 2 }}
-                        />
+                        <Tooltip
+                            title={
+                                <Box sx={{ p: 1 }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>Formatos soportados:</Typography>
+                                    <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.8rem' }}>
+                                        <li><b>0</b>: Envía el documento completo (sin recortes).</li>
+                                        <li><b>Número simple (Ej: "2")</b>: Envía las primeras 2 páginas.</li>
+                                        <li><b>Lista (Ej: "1,3,5")</b>: Envía solo las páginas 1, 3 y 5.</li>
+                                        <li><b>Rango (Ej: "1-3")</b>: Envía de la página 1 a la 3 y descarta el resto.</li>
+                                        <li><b>Combinado (Ej: "1, 3-5, 10")</b>: Envía pág. 1, rango 3 a 5, y la 10.</li>
+                                    </ul>
+                                </Box>
+                            }
+                            placement="top"
+                            arrow
+                        >
+                            <TextField
+                                margin="dense"
+                                label="Páginas a procesar"
+                                type="text"
+                                fullWidth
+                                variant="outlined"
+                                value={currentEmpresa.paginas_procesamiento ?? "2"}
+                                onChange={(e) => setCurrentEmpresa({ ...currentEmpresa, paginas_procesamiento: e.target.value })}
+                                helperText="Pasa el mouse para ver ejemplos avanzados de selección de hojas."
+                                sx={{ mt: 2 }}
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <InfoIcon color="action" />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Tooltip>
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={() => setOpenDialog(false)}>Cancelar</Button>

@@ -37,20 +37,68 @@ class QuoteProcessingService {
         return { selectedEmpresa, pagesToKeep };
     }
 
-    async optimizePdf(filePath, pagesToKeep) {
+    async optimizePdf(filePath, pagesConfig) {
         const existingPdfBytes = fs.readFileSync(filePath);
         const pdfDoc = await PDFDocument.load(existingPdfBytes, { ignoreEncryption: true });
         const pageCount = pdfDoc.getPageCount();
         let optimizedPath = filePath;
         let wasOptimized = false;
 
-        if (pagesToKeep > 0 && pageCount > pagesToKeep) {
-            console.log(`📄 PDF Largo detectado (${pageCount} págs). Optimizando a ${pagesToKeep} páginas para IA...`);
-            const newPdf = await PDFDocument.create();
-            const pageIndices = [];
-            for (let i = 0; i < pagesToKeep; i++) {
-                if (i < pageCount) pageIndices.push(i);
+        // Normalizar configuración a String
+        const configStr = String(pagesConfig || "2").trim();
+        let pageIndices = [];
+
+        // Estrategia 1: Selección Específica (contiene , ; o -)
+        if (configStr.includes(',') || configStr.includes(';') || configStr.includes('-')) {
+            console.log(`📄 Procesando selección específica de páginas: "${configStr}"`);
+            const parts = configStr.split(/[,;]+/);
+            const uniqueIndices = new Set();
+
+            for (const part of parts) {
+                const cleanPart = part.trim();
+                // Validar formato "N-M" o "N"
+                if (cleanPart.includes('-')) {
+                    // Rango "1-3"
+                    const [start, end] = cleanPart.split('-').map(n => parseInt(n));
+                    if (!isNaN(start) && !isNaN(end)) {
+                        // Math.min para no pasarse del total, aunque el filtro posterior lo arregla
+                        for (let i = start; i <= end; i++) uniqueIndices.add(i - 1);
+                    }
+                } else {
+                    // Página individual "5"
+                    const pageNum = parseInt(cleanPart);
+                    if (!isNaN(pageNum)) uniqueIndices.add(pageNum - 1);
+                }
             }
+            // Filtrar válidos (dentro del rango del PDF) y ordenar
+            pageIndices = Array.from(uniqueIndices)
+                .filter(idx => idx >= 0 && idx < pageCount)
+                .sort((a, b) => a - b);
+
+            console.log(`✅ Índices parseados: ${JSON.stringify(pageIndices)} (Total PDF: ${pageCount})`);
+
+        } else {
+            // Estrategia 2: Legacy "Primeras N páginas" (o 0 para todo)
+            const nPages = parseInt(configStr);
+            console.log(`📄 Configuración simple: ${nPages === 0 ? 'TODAS las páginas' : 'Primeras ' + nPages + ' páginas'}`);
+
+            if (!isNaN(nPages)) {
+                if (nPages === 0) {
+                    // 0 significa TODO el documento
+                    for (let i = 0; i < pageCount; i++) pageIndices.push(i);
+                } else if (nPages > 0) {
+                    // Primeras N páginas
+                    for (let i = 0; i < nPages; i++) {
+                        if (i < pageCount) pageIndices.push(i);
+                    }
+                }
+            }
+        }
+
+        // Si tenemos índices seleccionados y son menos que el total (o si es selección específica forzamos optimización)
+        if (pageIndices.length > 0 && (pageIndices.length < pageCount || configStr.includes(','))) {
+            console.log(`✂️ Creando PDF optimizado con ${pageIndices.length} páginas seleccionadas.`);
+            const newPdf = await PDFDocument.create();
             const pages = await newPdf.copyPages(pdfDoc, pageIndices);
             pages.forEach(page => newPdf.addPage(page));
 
@@ -58,6 +106,8 @@ class QuoteProcessingService {
             optimizedPath = path.join(path.dirname(filePath), `opt_${path.basename(filePath)}`);
             fs.writeFileSync(optimizedPath, pdfBytes);
             wasOptimized = true;
+        } else {
+            console.log("⚠️ No se requirió optimización (PDF original usado).");
         }
 
         return { optimizedPath, wasOptimized };
@@ -145,6 +195,7 @@ class QuoteProcessingService {
                 prima_uf10: c.primas?.uf_10 ? String(c.primas.uf_10) : null,
                 rc_monto: c.caracteristicas?.rc ? String(c.caracteristicas.rc) : null,
                 taller_marca: c.caracteristicas?.taller_marca,
+                reposicion_meses: c.caracteristicas?.reposicion_nuevo_meses ? String(c.caracteristicas.reposicion_nuevo_meses) : (c.caracteristicas?.reposicion_0km ? String(c.caracteristicas.reposicion_0km) : null),
                 observaciones: c.caracteristicas?.otros_beneficios,
                 CotizacionId: nuevaCotizacion.id,
                 empresa_id: selectedEmpresa ? selectedEmpresa.id : null,

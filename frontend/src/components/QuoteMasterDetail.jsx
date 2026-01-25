@@ -150,6 +150,7 @@ function Row({ quote, onUpdate }) {
                                         <TableCell align="right" sx={{ color: '#000000', fontWeight: 'bold' }}>UF 5</TableCell>
                                         <TableCell align="right" sx={{ color: '#000000', fontWeight: 'bold' }}>UF 10</TableCell>
                                         <TableCell sx={{ color: '#000000', fontWeight: 'bold' }}>Taller Marca</TableCell>
+                                        <TableCell sx={{ color: '#000000', fontWeight: 'bold' }}>Reposición</TableCell>
                                         <TableCell sx={{ color: '#000000', fontWeight: 'bold' }}>RC</TableCell>
                                         <TableCell align="center" sx={{ color: '#000000', fontWeight: 'bold' }}>Acciones</TableCell>
                                     </TableRow>
@@ -189,6 +190,11 @@ function Row({ quote, onUpdate }) {
                                                         {isEditing ? (
                                                             <input type="text" value={current.taller_marca || ''} onChange={(e) => handleChange(detalle.id, 'taller_marca', e.target.value)} style={{ width: '80px' }} />
                                                         ) : detalle.taller_marca}
+                                                    </TableCell>
+                                                    <TableCell sx={{ color: '#000000' }}>
+                                                        {isEditing ? (
+                                                            <input type="text" value={current.reposicion_meses || ''} onChange={(e) => handleChange(detalle.id, 'reposicion_meses', e.target.value)} style={{ width: '50px' }} />
+                                                        ) : detalle.reposicion_meses}
                                                     </TableCell>
                                                     <TableCell sx={{ color: '#000000' }}>
                                                         {isEditing ? (

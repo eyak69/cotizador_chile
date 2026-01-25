@@ -3,8 +3,18 @@ const { connectDB } = require('./database');
 
 const port = 3000;
 
+const seedCompanies = require('./backend/seeders/companySeeder');
+
 // Conexión a Base de Datos
-connectDB().then(() => {
+connectDB().then(async () => {
+    // Ejecutar Seeder Automático
+    try {
+        await seedCompanies();
+        console.log("✅ Prompts iniciales cargados correctamente.");
+    } catch (seedErr) {
+        console.error("⚠️ Error corriendo seeder inicial:", seedErr);
+    }
+
     // Start Server solo si la BD conecta (opcional, aquí no bloquea)
     app.listen(port, () => {
         console.log(`Servidor escuchando en http://localhost:${port}`);
