@@ -119,16 +119,9 @@ async function seedCompanies() {
         });
 
         if (!created) {
-            // Si ya existe, nos aseguramos de que el prompt esté actualizado con nuestra última mejor versión
-            // Pero OJO: Si el usuario hizo cambios manuales en producción, ¿queremos sobreescribirlos?
-            // Para este caso de "Deploy Inicial" o "Reset", sí. Pero voy a ser conservador:
-            // Solo actualizo si el prompt está vacío o es muy diferente.
-            // MEJOR: Actualizo SIEMPRE el prompt base, porque acabamos de definir que estos son los "GOLDEN".
-            empresa.prompt_reglas = data.prompt_reglas;
-            // También actualizamos paginas si es ANS
-            if (data.nombre === 'ANS') empresa.paginas_procesamiento = data.paginas_procesamiento;
-
-            await empresa.save();
+            console.log(`⏭️  ${data.nombre} ya existe. Saltando creación para respetar configuración manual.`);
+        } else {
+            console.log(`✨ Empresa creada correctamente: ${data.nombre}`);
         }
     }
     console.log("✅ Seed completado: Empresas Maestras sincronizadas.");
