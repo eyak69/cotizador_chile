@@ -90,6 +90,7 @@ IMPORTANTE: Responde ÚNICAMENTE con el objeto JSON válido. NO incluyas introdu
     {
       "compania": "Nombre",
       "plan": "Nombre",
+      "paginas_encontradas": [1],
       "primas": {
         "uf_3": 0.00,
         "uf_5": 0.00,

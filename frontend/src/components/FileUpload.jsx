@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Box, Typography, Button, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Alert, Snackbar, Select, MenuItem, FormControl, InputLabel, Backdrop } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Alert, Snackbar, Select, MenuItem, FormControl, InputLabel, Backdrop, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
@@ -17,6 +17,10 @@ const FileUpload = ({ onQuoteProcessed }) => {
     const [toastOpen, setToastOpen] = useState(false);
     const [toastMsg, setToastMsg] = useState('');
     const [debugData, setDebugData] = useState(null);
+
+    // State for optimization suggestion
+    const [suggestionOpen, setSuggestionOpen] = useState(false);
+    const [suggestionData, setSuggestionData] = useState(null);
 
     React.useEffect(() => {
         axios.get('/api/empresas')
@@ -158,6 +162,12 @@ const FileUpload = ({ onQuoteProcessed }) => {
                         archivo: file.name,
                         ai_json: data.raw_ai_response
                     });
+                }
+
+                // Verificamos si hay sugerencia de optimización (solo una por batch para no molestar)
+                if (data.optimization_suggestion && !suggestionData) {
+                    setSuggestionData(data.optimization_suggestion);
+                    setSuggestionOpen(true);
                 }
 
                 // El último registro contiene todos los detalles acumulados
@@ -302,6 +312,53 @@ const FileUpload = ({ onQuoteProcessed }) => {
                     {toastMsg}
                 </Alert>
             </Snackbar>
+
+            {/* Dialogo de Sugerencia de Optimización */}
+            <Dialog
+                open={suggestionOpen}
+                onClose={() => setSuggestionOpen(false)}
+            >
+                <DialogTitle>🚀 Optimización Detectada</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {suggestionData?.message}
+                        <br /><br />
+                        ¿Desea actualizar la configuración de <b>{suggestionData?.companyName}</b> para leer solo estas páginas en el futuro? Esto hará el proceso más rápido y económico.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setSuggestionOpen(false)} color="secondary">
+                        No, seguir leyendo todo
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            if (suggestionData) {
+                                axios.put(`/api/empresas/${suggestionData.companyId}`, {
+                                    paginas_procesamiento: suggestionData.suggestedPages
+                                })
+                                    .then(() => {
+                                        setToastMsg(`✅ Configuración actualizada para ${suggestionData.companyName}`);
+                                        setToastOpen(true);
+                                        // Actualizar lista local de empresas para reflejar el cambio en futuros selects
+                                        setCompanies(prev => prev.map(c => c.id === suggestionData.companyId ? { ...c, paginas_procesamiento: suggestionData.suggestedPages } : c));
+                                    })
+                                    .catch(err => {
+                                        console.error("Error actualizando empresa:", err);
+                                        setToastMsg("❌ Error al actualizar configuración.");
+                                        setToastOpen(true);
+                                    });
+                            }
+                            setSuggestionOpen(false);
+                            setSuggestionData(null);
+                        }}
+                        color="primary"
+                        variant="contained"
+                        autoFocus
+                    >
+                        Sí, optimizar
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Debugger Section */}
             {showDebug && debugData && (

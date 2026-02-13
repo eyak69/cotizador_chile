@@ -1,6 +1,6 @@
 const { Cotizacion, DetalleCotizacion, Empresa, Parametro } = require('../../models/mysql_models');
 const { interpretQuoteData: interpretQuoteGemini } = require('../utils/ai_interpreter');
-const { interpretQuoteData: interpretQuoteOpenAI } = require('../utils/ai_interpreter_openai');
+// const { interpretQuoteData: interpretQuoteOpenAI } = require('../utils/ai_interpreter_openai'); // DESHABILITADO POR SOLICITUD USUARIO
 const { PDFDocument } = require('pdf-lib');
 const path = require('path');
 const fs = require('fs');
@@ -154,7 +154,14 @@ class QuoteProcessingService {
     }
 
     async processWithAI(filePath, originalName, aiConfig, selectedEmpresa) {
-        const interpreterFunction = aiConfig.activeProviderKey === 'openai' ? interpretQuoteOpenAI : interpretQuoteGemini;
+        // FORZADO: Usar siempre Gemini por ahora y ocultar OpenAI
+        const interpreterFunction = interpretQuoteGemini;
+
+        // Sobre-escribir configuración para asegurar Gemini
+        aiConfig.activeProviderKey = 'google';
+        if (!aiConfig.apiKey && aiConfig.useModel !== 'gemini-1.5-flash') {
+            // Si faltara key, el interpreter la busca, pero aquí aseguramos el 'google'
+        }
 
         const interpreterConfig = {
             apiKey: aiConfig.apiKey,
@@ -163,7 +170,7 @@ class QuoteProcessingService {
             debugMode: aiConfig.debugMode
         };
 
-        console.log(`Usando IA: ${aiConfig.activeProviderKey} - Model: ${aiConfig.useModel}`);
+        console.log(`Usando IA (FORZADO GEMINI): ${aiConfig.activeProviderKey} - Model: ${aiConfig.useModel}`);
         return await interpreterFunction(filePath, originalName, interpreterConfig);
     }
 
@@ -188,15 +195,16 @@ class QuoteProcessingService {
 
         if (quoteData.comparativa_seguros && quoteData.comparativa_seguros.length > 0) {
             const detalles = quoteData.comparativa_seguros.map(c => ({
-                compania: c.compania,
-                plan: c.plan,
-                prima_uf3: c.primas?.uf_3 ? String(c.primas.uf_3) : null,
-                prima_uf5: c.primas?.uf_5 ? String(c.primas.uf_5) : null,
-                prima_uf10: c.primas?.uf_10 ? String(c.primas.uf_10) : null,
-                rc_monto: c.caracteristicas?.rc ? String(c.caracteristicas.rc) : null,
-                taller_marca: c.caracteristicas?.taller_marca,
+                compania: c.compania ? (typeof c.compania === 'object' ? JSON.stringify(c.compania) : c.compania) : null,
+                plan: typeof c.plan === 'object' ? JSON.stringify(c.plan) : (c.plan || null),
+                prima_uf3: c.primas?.uf_3 ? (typeof c.primas.uf_3 === 'object' ? JSON.stringify(c.primas.uf_3) : String(c.primas.uf_3)) : null,
+                prima_uf5: c.primas?.uf_5 ? (typeof c.primas.uf_5 === 'object' ? JSON.stringify(c.primas.uf_5) : String(c.primas.uf_5)) : null,
+                prima_uf10: c.primas?.uf_10 ? (typeof c.primas.uf_10 === 'object' ? JSON.stringify(c.primas.uf_10) : String(c.primas.uf_10)) : null,
+                rc_monto: c.caracteristicas?.rc ? (typeof c.caracteristicas.rc === 'object' ? JSON.stringify(c.caracteristicas.rc) : String(c.caracteristicas.rc)) : null,
+                taller_marca: c.caracteristicas?.taller_marca ? (typeof c.caracteristicas.taller_marca === 'object' ? JSON.stringify(c.caracteristicas.taller_marca) : String(c.caracteristicas.taller_marca)) : null,
                 reposicion_meses: c.caracteristicas?.reposicion_nuevo_meses ? String(c.caracteristicas.reposicion_nuevo_meses) : (c.caracteristicas?.reposicion_0km ? String(c.caracteristicas.reposicion_0km) : null),
-                observaciones: c.caracteristicas?.otros_beneficios,
+                paginas_encontradas: c.paginas_encontradas ? (Array.isArray(c.paginas_encontradas) ? c.paginas_encontradas.join(',') : String(c.paginas_encontradas)) : null,
+                observaciones: typeof c.caracteristicas?.otros_beneficios === 'object' ? JSON.stringify(c.caracteristicas.otros_beneficios) : (c.caracteristicas?.otros_beneficios || null),
                 CotizacionId: nuevaCotizacion.id,
                 empresa_id: selectedEmpresa ? selectedEmpresa.id : null,
                 rutaArchivo: `/uploads/final/${finalFileName}`
@@ -212,6 +220,49 @@ class QuoteProcessingService {
 
             if (detallesAInsertar.length > 0) await DetalleCotizacion.bulkCreate(detallesAInsertar);
         }
+
+        // --- Lógica de Aprendizaje / Sugerencia de Optimización ---
+        let optimization_suggestion = null;
+        if (selectedEmpresa && (selectedEmpresa.paginas_procesamiento === '0' || selectedEmpresa.paginas_procesamiento === 0 || !selectedEmpresa.paginas_procesamiento)) {
+            // Recolectar todas las páginas encontradas en este lote para esta empresa
+            const allFoundPages = new Set();
+            if (quoteData.comparativa_seguros) {
+                quoteData.comparativa_seguros.forEach(c => {
+                    if (c.paginas_encontradas) {
+                        const pages = Array.isArray(c.paginas_encontradas) ? c.paginas_encontradas : [c.paginas_encontradas];
+                        pages.forEach(p => {
+                            const pNum = parseInt(p);
+                            if (!isNaN(pNum)) allFoundPages.add(pNum);
+                        });
+                    }
+                });
+            }
+
+            if (allFoundPages.size > 0) {
+                // Convertir a array ordenado
+                const sortedPages = Array.from(allFoundPages).sort((a, b) => a - b);
+                // Convertir a string formato "1,2,5" (o rangos si quisiéramos ser fancy, pero coma separada basta)
+                const suggestedPagesStr = sortedPages.join(',');
+
+                // Solo sugerir si lo encontrado es algo específico (no vacío)
+                if (suggestedPagesStr) {
+                    optimization_suggestion = {
+                        companyId: selectedEmpresa.id,
+                        companyName: selectedEmpresa.nombre,
+                        currentPages: selectedEmpresa.paginas_procesamiento || '0',
+                        suggestedPages: suggestedPagesStr,
+                        message: `La IA detectó que la información útil de ${selectedEmpresa.nombre} se encuentra en las páginas ${suggestedPagesStr}.`
+                    };
+                }
+            }
+        }
+
+        // Devolvemos la instancia y la sugerencia (hack: inyectamos la prop en el objeto instancia sequelize si es posible, o retornamos un objeto compuesto)
+        // Dado que return nuevaCotizacion se usa, y es un modelo Sequelize, mejor retornamos un objeto envuelto o adjuntamos como property "dataValues" extra si el controller lo espera.
+        // Pero el controller hace: const nuevaCotizacion = await ...saveQuoteToDB
+        // Modificaré el controller para esperar { cotizacion, suggestion } o adjuntarlo.
+        // Para no romper firmas, lo adjunto como propiedad no-persistente al objeto cotizacion.
+        nuevaCotizacion.setDataValue('optimization_suggestion', optimization_suggestion);
 
         return nuevaCotizacion;
     }

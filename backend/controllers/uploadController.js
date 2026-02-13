@@ -53,6 +53,8 @@ exports.processUpload = async (req, res) => {
         const nuevaCotizacion = await QuoteProcessingService.saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalFileName);
         console.log('Cotización guardada en MySQL ID:', nuevaCotizacion.id);
 
+        const optimizationSuggestion = nuevaCotizacion.getDataValue('optimization_suggestion');
+
         // 7. Respuesta
         const cotizacionCompleta = await Cotizacion.findByPk(nuevaCotizacion.id, {
             include: [{ model: DetalleCotizacion, as: 'detalles' }]
@@ -60,7 +62,8 @@ exports.processUpload = async (req, res) => {
 
         res.json({
             ...cotizacionCompleta.toJSON(),
-            raw_ai_response: quoteData
+            raw_ai_response: quoteData,
+            optimization_suggestion: optimizationSuggestion
         });
 
     } catch (error) {

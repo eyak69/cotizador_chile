@@ -43,6 +43,7 @@ const DetalleCotizacion = sequelize.define('DetalleCotizacion', {
   rc_tipo: { type: DataTypes.STRING },
   taller_marca: { type: DataTypes.STRING },
   reposicion_meses: { type: DataTypes.STRING },
+  paginas_encontradas: { type: DataTypes.STRING }, // Nuevo campo para tracking de fuente
   observaciones: { type: DataTypes.TEXT },
   rutaArchivo: { type: DataTypes.STRING }
 }, { tableName: 'detallecotizacions' });

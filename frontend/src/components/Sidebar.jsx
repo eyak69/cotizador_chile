@@ -15,10 +15,22 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import BusinessIcon from '@mui/icons-material/Business';
 import HistoryIcon from '@mui/icons-material/History';
 import SettingsIcon from '@mui/icons-material/Settings';
+import axios from 'axios';
+import { useState, useEffect } from 'react';
 
 const drawerWidth = 240;
 
 const Sidebar = ({ currentTab, onTabChange }) => {
+    const [version, setVersion] = useState('');
+
+    useEffect(() => {
+        axios.get('/api/config')
+            .then(res => {
+                if (res.data.system_version) setVersion(res.data.system_version);
+            })
+            .catch(err => console.error("Error obteniendo version:", err));
+    }, []);
+
     const menuItems = [
         { text: 'Cotizador', icon: <DashboardIcon />, index: 0 },
         { text: 'Empresas', icon: <BusinessIcon />, index: 1 },
@@ -87,7 +99,14 @@ const Sidebar = ({ currentTab, onTabChange }) => {
                     ))}
                 </List>
             </Box>
-        </Drawer>
+
+
+            <Box sx={{ mt: 'auto', p: 2, textAlign: 'center' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', opacity: 0.7 }}>
+                    v{version || '...'}
+                </Typography>
+            </Box>
+        </Drawer >
     );
 };
 

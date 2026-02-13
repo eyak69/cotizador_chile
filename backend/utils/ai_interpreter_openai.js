@@ -13,10 +13,33 @@ async function interpretQuoteData(filePath, originalFileName = "", config = {}) 
   console.log(`--> Iniciando interpretQuoteData (OpenAI: ${modelName}) con archivo: ${filePath}`);
 
   try {
-    // 1. Leer y extraer texto del PDF (Volvemos a pdf-parse que funciona bien)
+    // --- Helper para numeración de páginas en PDF ---
+    function render_page(pageData) {
+      let render_options = {
+        normalizeWhitespace: true,
+        disableCombineTextItems: false
+      }
+
+      return pageData.getTextContent(render_options)
+        .then(function (textContent) {
+          let lastY, text = '';
+          for (let item of textContent.items) {
+            if (lastY == item.transform[5] || !lastY) {
+              text += item.str;
+            }
+            else {
+              text += '\n' + item.str;
+            }
+            lastY = item.transform[5];
+          }
+          // Inyectamos marcador de página explícito para que la IA lo vea
+          return text + `\n---[[PÁGINA ${pageData.pageIndex !== undefined ? pageData.pageIndex + 1 : "?"}]]---\n`;
+        });
+    }
+
+    // 1. Leer y extraer texto del PDF con marcadores de página
     const dataBuffer = fs.readFileSync(filePath);
-    // Leemos todo el PDF sin limites de paginas
-    const pdfData = await pdf(dataBuffer);
+    const pdfData = await pdf(dataBuffer, { pagerender: render_page });
     const pdfText = pdfData.text;
 
     // DEBUG: Guardar texto
@@ -47,6 +70,7 @@ IMPORTANTE: Responde ÚNICAMENTE con el objeto JSON válido. NO incluyas introdu
     {
       "compania": "Nombre",
       "plan": "Nombre",
+      "paginas_encontradas": [1],
       "primas": {
         "uf_3": 0.00,
         "uf_5": 0.00,

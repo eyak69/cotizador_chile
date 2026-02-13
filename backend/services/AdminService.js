@@ -44,6 +44,15 @@ class AdminService {
         const params = await Parametro.findAll();
         const config = {};
         params.forEach(p => config[p.parametro] = p.valor);
+
+        // Agregar versión del sistema leida de package.json
+        try {
+            const packageJson = require('../../package.json');
+            config.system_version = packageJson.version;
+        } catch (e) {
+            config.system_version = 'Unknown';
+        }
+
         return config;
     }
 

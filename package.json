@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "cotizador2",
-  "version": "1.0.0",
+  "version": "1.1.2",
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
