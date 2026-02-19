@@ -110,21 +110,21 @@ Auto de Reemplazo: Identifica el límite de 25 días y el copago de $5.000`
 ];
 
 async function seedCompanies() {
-    console.log("🌱 Verificando/Creando Prompts Maestros...");
+    console.log("🌱 Verificando/Creando Prompts Maestros (globales, userId=null)...");
     for (const data of companyPrompts) {
-        // Upsert simple usando el nombre como clave única
+        // Empresas globales de referencia (userId = null)
         const [empresa, created] = await Empresa.findOrCreate({
-            where: { nombre: data.nombre },
-            defaults: data
+            where: { nombre: data.nombre, userId: null },
+            defaults: { ...data, userId: null }
         });
 
         if (!created) {
-            console.log(`⏭️  ${data.nombre} ya existe. Saltando creación para respetar configuración manual.`);
+            console.log(`⏭️  ${data.nombre} ya existe. Saltando.`);
         } else {
-            console.log(`✨ Empresa creada correctamente: ${data.nombre}`);
+            console.log(`✨ Empresa plantilla creada: ${data.nombre}`);
         }
     }
-    console.log("✅ Seed completado: Empresas Maestras sincronizadas.");
+    console.log("✅ Seed completado.");
 }
 
 module.exports = seedCompanies;

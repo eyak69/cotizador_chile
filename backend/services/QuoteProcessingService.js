@@ -9,19 +9,20 @@ const getRootDir = () => path.resolve(__dirname, '..', '..');
 
 class QuoteProcessingService {
 
-    async identifyCompany(fileName, manualCompanyId) {
+    async identifyCompany(fileName, manualCompanyId, userId) {
         let pagesToKeep = 2;
         let selectedEmpresa = null;
 
         try {
             if (manualCompanyId) {
-                selectedEmpresa = await Empresa.findByPk(manualCompanyId);
+                // Solo puede seleccionar empresas que le pertenecen
+                selectedEmpresa = await Empresa.findOne({ where: { id: manualCompanyId, userId } });
                 if (selectedEmpresa) {
                     if (selectedEmpresa.paginas_procesamiento != null) pagesToKeep = selectedEmpresa.paginas_procesamiento;
                     console.log(`🏢 Empresa seleccionada manualmente: ${selectedEmpresa.nombre} -> Límite páginas: ${pagesToKeep}`);
                 }
             } else {
-                const empresas = await Empresa.findAll();
+                const empresas = await Empresa.findAll({ where: { userId } });
                 const fileNameUpper = fileName.toUpperCase();
                 for (const emp of empresas) {
                     if (fileNameUpper.includes(emp.nombre.toUpperCase())) {
@@ -113,7 +114,7 @@ class QuoteProcessingService {
         return { optimizedPath, wasOptimized };
     }
 
-    async getAIConfiguration() {
+    async getAIConfiguration(userId) {
         let activeModelId = 'gemini-1.5-flash';
         let activeProviderKey = 'google';
         let useModel = 'gemini-1.5-flash';
@@ -121,7 +122,8 @@ class QuoteProcessingService {
         let debugMode = true;
 
         try {
-            const paramConfig = await Parametro.findByPk('IA_CONFIG');
+            // Buscar configuración del usuario actual
+            const paramConfig = await Parametro.findOne({ where: { parametro: 'IA_CONFIG', userId } });
             if (paramConfig && paramConfig.valor) {
                 const fullConfig = JSON.parse(paramConfig.valor);
                 const iaConf = fullConfig.configuracion_ia;
@@ -140,10 +142,13 @@ class QuoteProcessingService {
 
             const keyMap = { 'google': 'GEMINI_API_KEY', 'openai': 'OPENAI_API_KEY' };
             const envVarName = keyMap[activeProviderKey];
-            const paramKey = await Parametro.findByPk(envVarName);
+            const paramKey = await Parametro.findOne({ where: { parametro: envVarName, userId } });
             if (paramKey) apiKey = paramKey.valor;
 
-            const pDebug = await Parametro.findByPk('DEBUG');
+            // Fallback: leer key del .env si el user no tiene una configurada
+            if (!apiKey && activeProviderKey === 'google') apiKey = process.env.GEMINI_API_KEY || '';
+
+            const pDebug = await Parametro.findOne({ where: { parametro: 'DEBUG', userId } });
             if (pDebug && pDebug.valor === 'false') debugMode = false;
 
         } catch (dbError) {
@@ -209,6 +214,7 @@ class QuoteProcessingService {
                 CotizacionId: nuevaCotizacion.id,
                 empresa_id: selectedEmpresa ? selectedEmpresa.id : null,
                 rutaArchivo: `/uploads/final/${finalFileName}`
+                // userId no necesario: hereda de Cotizacion
             }));
 
             const detallesAInsertar = [];

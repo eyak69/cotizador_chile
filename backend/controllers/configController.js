@@ -2,7 +2,7 @@ const AdminService = require('../services/AdminService');
 
 exports.getConfig = async (req, res) => {
     try {
-        const config = await AdminService.getConfig();
+        const config = await AdminService.getConfig(req.user.id);
         res.json(config);
     } catch (error) {
         console.error("Error fetching config:", error);
@@ -13,7 +13,7 @@ exports.getConfig = async (req, res) => {
 exports.updateConfig = async (req, res) => {
     try {
         const { GEMINI_API_KEY, OPENAI_API_KEY, IA_CONFIG } = req.body;
-        const result = await AdminService.updateConfigKeys(GEMINI_API_KEY, OPENAI_API_KEY, IA_CONFIG);
+        const result = await AdminService.updateConfigKeys(GEMINI_API_KEY, OPENAI_API_KEY, IA_CONFIG, req.user.id);
         res.json(result);
     } catch (error) {
         console.error("Error updating config:", error);
@@ -26,7 +26,7 @@ exports.saveParameter = async (req, res) => {
         const { parametro, valor } = req.body;
         if (!parametro) return res.status(400).json({ error: "El nombre del parámetro es requerido." });
 
-        const result = await AdminService.saveParameter(parametro, valor);
+        const result = await AdminService.saveParameter(parametro, valor, req.user.id);
         res.json(result);
     } catch (error) {
         console.error("Error saving parameter:", error);
@@ -37,7 +37,7 @@ exports.saveParameter = async (req, res) => {
 exports.deleteParameter = async (req, res) => {
     try {
         const { key } = req.params;
-        const result = await AdminService.deleteParameter(key);
+        const result = await AdminService.deleteParameter(key, req.user.id);
         res.json(result);
     } catch (error) {
         console.error("Error deleting parameter:", error);

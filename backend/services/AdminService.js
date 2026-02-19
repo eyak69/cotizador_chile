@@ -6,22 +6,23 @@ const getRootDir = () => path.resolve(__dirname, '..', '..');
 
 class AdminService {
 
-    // --- Lógica de Empresas ---
+    // ─── Empresas (por usuario) ────────────────────────────────────────────────
 
-    async getAllEmpresas() {
-        return await Empresa.findAll();
+    async getAllEmpresas(userId) {
+        return await Empresa.findAll({ where: { userId } });
     }
 
-    async createEmpresa(data) {
+    async createEmpresa(data, userId) {
         return await Empresa.create({
             nombre: data.nombre,
             prompt_reglas: data.prompt_reglas,
-            paginas_procesamiento: data.paginas_procesamiento !== undefined ? data.paginas_procesamiento : 2
+            paginas_procesamiento: data.paginas_procesamiento !== undefined ? data.paginas_procesamiento : 2,
+            userId
         });
     }
 
-    async updateEmpresa(id, data) {
-        const empresa = await Empresa.findByPk(id);
+    async updateEmpresa(id, data, userId) {
+        const empresa = await Empresa.findOne({ where: { id, userId } });
         if (!empresa) throw new Error("Empresa no encontrada");
 
         if (data.nombre) empresa.nombre = data.nombre;
@@ -31,21 +32,20 @@ class AdminService {
         return await empresa.save();
     }
 
-    async deleteEmpresa(id) {
-        const empresa = await Empresa.findByPk(id);
+    async deleteEmpresa(id, userId) {
+        const empresa = await Empresa.findOne({ where: { id, userId } });
         if (!empresa) throw new Error("Empresa no encontrada");
         return await empresa.destroy();
     }
 
+    // ─── Configuración / Parámetros (por usuario) ─────────────────────────────
 
-    // --- Lógica de Configuración ---
-
-    async getConfig() {
-        const params = await Parametro.findAll();
+    async getConfig(userId) {
+        const params = await Parametro.findAll({ where: { userId } });
         const config = {};
         params.forEach(p => config[p.parametro] = p.valor);
 
-        // Agregar versión del sistema leida de package.json
+        // Versión del sistema
         try {
             const packageJson = require('../../package.json');
             config.system_version = packageJson.version;
@@ -56,28 +56,36 @@ class AdminService {
         return config;
     }
 
-    async updateConfigKeys(geminiKey, openaiKey, iaConfig) {
-        if (geminiKey !== undefined) await Parametro.upsert({ parametro: 'GEMINI_API_KEY', valor: geminiKey });
-        if (openaiKey !== undefined) await Parametro.upsert({ parametro: 'OPENAI_API_KEY', valor: openaiKey });
-
-        if (iaConfig) {
-            await Parametro.upsert({ parametro: 'IA_CONFIG', valor: JSON.stringify(iaConfig) });
-        }
+    async updateConfigKeys(geminiKey, openaiKey, iaConfig, userId) {
+        if (geminiKey !== undefined) await this._upsertParam('GEMINI_API_KEY', geminiKey, userId);
+        if (openaiKey !== undefined) await this._upsertParam('OPENAI_API_KEY', openaiKey, userId);
+        if (iaConfig) await this._upsertParam('IA_CONFIG', JSON.stringify(iaConfig), userId);
         return { message: "Configuración actualizada correctamente." };
     }
 
-    async saveParameter(parametro, valor) {
-        await Parametro.upsert({ parametro, valor });
+    async saveParameter(parametro, valor, userId) {
+        await this._upsertParam(parametro, valor, userId);
         return { message: "Parámetro guardado correctamente." };
     }
 
-    async deleteParameter(key) {
-        const deleted = await Parametro.destroy({ where: { parametro: key } });
+    async deleteParameter(key, userId) {
+        const deleted = await Parametro.destroy({ where: { parametro: key, userId } });
         if (!deleted) throw new Error("Parámetro no encontrado");
         return { message: "Parámetro eliminado." };
     }
 
-    // --- Lógica de Templates ---
+    // Helper de upsert per-user (ya que el PK ahora es id numérico)
+    async _upsertParam(parametro, valor, userId) {
+        const existing = await Parametro.findOne({ where: { parametro, userId } });
+        if (existing) {
+            existing.valor = valor;
+            await existing.save();
+        } else {
+            await Parametro.create({ parametro, valor, userId });
+        }
+    }
+
+    // ─── Templates (compartidos / por instancia de servidor) ──────────────────
 
     moveTemplate(filePath) {
         const rootDir = getRootDir();
@@ -85,8 +93,6 @@ class AdminService {
         if (!fs.existsSync(templateDir)) fs.mkdirSync(templateDir, { recursive: true });
 
         const templatePath = path.join(templateDir, 'plantilla_presupuesto.docx');
-        // fs.renameSync falla entre dispositivos (EXDEV) en Docker si movemos de un volumen a una carpeta del contenedor.
-        // Usamos copy + unlink para evitar esto.
         fs.copyFileSync(filePath, templatePath);
         fs.unlinkSync(filePath);
         return { message: 'Plantilla de presupuesto actualizada con éxito.' };

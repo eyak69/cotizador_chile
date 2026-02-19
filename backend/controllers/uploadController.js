@@ -9,14 +9,14 @@ exports.processUpload = async (req, res) => {
         console.log(`Procesando archivo subido: ${req.file.originalname}`);
 
         // 1. Identificar Empresa
-        const { selectedEmpresa, pagesToKeep } = await QuoteProcessingService.identifyCompany(req.file.originalname, req.body.companyId);
+        const { selectedEmpresa, pagesToKeep } = await QuoteProcessingService.identifyCompany(req.file.originalname, req.body.companyId, req.user.id);
 
         // 2. Optimizar PDF si es necesario
         const { optimizedPath, wasOptimized } = await QuoteProcessingService.optimizePdf(req.file.path, pagesToKeep);
         const pathForAI = optimizedPath;
 
         // 3. Configuración IA
-        const aiConfig = await QuoteProcessingService.getAIConfiguration();
+        const aiConfig = await QuoteProcessingService.getAIConfiguration(req.user.id);
 
         // 4. Llamada IA
         const quoteData = await QuoteProcessingService.processWithAI(pathForAI, req.file.originalname, aiConfig, selectedEmpresa);

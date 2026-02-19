@@ -2,7 +2,7 @@ const AdminService = require('../services/AdminService');
 
 exports.getEmpresas = async (req, res) => {
     try {
-        const empresas = await AdminService.getAllEmpresas();
+        const empresas = await AdminService.getAllEmpresas(req.user.id);
         res.json(empresas);
     } catch (error) {
         console.error("Error fetching empresas:", error);
@@ -16,7 +16,7 @@ exports.createEmpresa = async (req, res) => {
         if (!nombre || !prompt_reglas) {
             return res.status(400).json({ error: "Nombre y reglas son requeridos." });
         }
-        const nuevaEmpresa = await AdminService.createEmpresa(req.body);
+        const nuevaEmpresa = await AdminService.createEmpresa(req.body, req.user.id);
         res.json(nuevaEmpresa);
     } catch (error) {
         console.error("Error creating empresa:", error);
@@ -27,7 +27,7 @@ exports.createEmpresa = async (req, res) => {
 exports.updateEmpresa = async (req, res) => {
     try {
         const { id } = req.params;
-        const empresa = await AdminService.updateEmpresa(id, req.body);
+        const empresa = await AdminService.updateEmpresa(id, req.body, req.user.id);
         res.json(empresa);
     } catch (error) {
         console.error("Error updating empresa:", error);
@@ -39,7 +39,7 @@ exports.updateEmpresa = async (req, res) => {
 exports.deleteEmpresa = async (req, res) => {
     try {
         const { id } = req.params;
-        await AdminService.deleteEmpresa(id);
+        await AdminService.deleteEmpresa(id, req.user.id);
         res.json({ message: "Empresa eliminada correctamente." });
     } catch (error) {
         console.error("Error deleting empresa:", error);
