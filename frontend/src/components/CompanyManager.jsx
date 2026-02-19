@@ -8,7 +8,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import InfoIcon from '@mui/icons-material/Info';
-import axios from 'axios';
+import api from '../services/api';
 
 const CompanyManager = () => {
     const [empresas, setEmpresas] = useState([]);
@@ -23,7 +23,7 @@ const CompanyManager = () => {
 
     const fetchEmpresas = async () => {
         try {
-            const res = await axios.get('/api/empresas');
+            const res = await api.get('/empresas');
             setEmpresas(res.data);
         } catch (error) {
             showToast('Error al cargar empresas', 'error');
@@ -33,14 +33,13 @@ const CompanyManager = () => {
     const handleSave = async () => {
         try {
             if (isEditing) {
-                await axios.put(`/api/empresas/${currentEmpresa.id}`, currentEmpresa);
+                await api.put(`/empresas/${currentEmpresa.id}`, currentEmpresa);
                 showToast('Empresa actualizada correctamente');
             } else {
-                await axios.post('/api/empresas', currentEmpresa);
+                await api.post('/empresas', currentEmpresa);
                 showToast('Empresa creada correctamente');
             }
             setOpenDialog(false);
-            fetchEmpresas();
             fetchEmpresas();
         } catch (error) {
             console.error("Error saving company:", error);
@@ -52,7 +51,7 @@ const CompanyManager = () => {
     const handleDelete = async (id) => {
         if (!window.confirm('¿Seguro que deseas eliminar esta empresa?')) return;
         try {
-            await axios.delete(`/api/empresas/${id}`);
+            await api.delete(`/empresas/${id}`);
             showToast('Empresa eliminada correctamente');
             fetchEmpresas();
         } catch (error) {

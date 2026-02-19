@@ -1,108 +1,82 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Box, Paper, Typography, TextField, Button, MenuItem,
-    FormControl, InputLabel, Select, Snackbar, Alert, Divider, Grid,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Dialog, DialogTitle, DialogContent, DialogActions
+    Box, Paper, Typography, TextField, Button, Snackbar, Alert, Divider,
+    Grid, CircularProgress, Chip, InputAdornment, IconButton, Accordion,
+    AccordionSummary, AccordionDetails, Table, TableBody, TableCell,
+    TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
-import axios from 'axios';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import KeyIcon from '@mui/icons-material/Key';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import TuneIcon from '@mui/icons-material/Tune';
+import DescriptionIcon from '@mui/icons-material/Description';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const SettingsPanel = () => {
-    // Configuración AI Específica
-    const [config, setConfig] = useState({
-        GEMINI_API_KEY: '',
-        OPENAI_API_KEY: '',
-        IA_CONFIG: null
-    });
+    const { user } = useAuth();
 
-    // Gestión de Parámetros Generales (ABM)
+    // API Keys del usuario
+    const [geminiKey, setGeminiKey] = useState('');
+    const [showGemini, setShowGemini] = useState(false);
+    const [geminiSaved, setGeminiSaved] = useState(false);
+
+    // Gestión de parámetros avanzados (ABM)
     const [parameters, setParameters] = useState([]);
     const [openDialog, setOpenDialog] = useState(false);
     const [editingParam, setEditingParam] = useState({ parametro: '', valor: '' });
     const [isNew, setIsNew] = useState(false);
 
-    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState({ open: false, msg: '', severity: 'success' });
 
     useEffect(() => {
         fetchConfig();
-        fetchParameters(); // Obtener lista completa para ABM
     }, []);
 
     const fetchConfig = async () => {
         try {
-            const res = await axios.get('/api/config');
+            const res = await api.get('/config');
             const data = res.data;
-            let iaConfig = null;
-            if (data.IA_CONFIG) {
-                try {
-                    iaConfig = JSON.parse(data.IA_CONFIG);
-                } catch (e) { console.error("Error parsing IA_CONFIG", e); }
-            }
-            setConfig({
-                GEMINI_API_KEY: data.GEMINI_API_KEY || '',
-                OPENAI_API_KEY: data.OPENAI_API_KEY || '',
-                IA_CONFIG: iaConfig
-            });
-        } catch (error) {
-            console.error("Error cargando config", error);
-        }
-    };
+            setGeminiKey(data.GEMINI_API_KEY || '');
+            setGeminiSaved(!!data.GEMINI_API_KEY);
 
-    const fetchParameters = async () => {
-        try {
-            // Asumimos que /api/parameters devuelve array [{parametro, valor}, ...]
-            // Si no existe, usamos el mismo GET /api/config y lo transformamos
-            const res = await axios.get('/api/config');
-            // Transformar objeto { clave: valor } a array [{parametro, valor}]
-            const paramsArray = Object.keys(res.data).map(key => ({
-                parametro: key,
-                valor: res.data[key]
-            }));
+            // Construir array de parámetros para la tabla ABM
+            // Excluimos los que ya tienen sección propia
+            const excludedKeys = ['GEMINI_API_KEY', 'OPENAI_API_KEY', 'system_version'];
+            const paramsArray = Object.entries(data)
+                .filter(([key]) => !excludedKeys.includes(key))
+                .map(([parametro, valor]) => ({ parametro, valor }));
             setParameters(paramsArray);
         } catch (error) {
-            console.error("Error cargando parámetros", error);
+            console.error("Error cargando config", error);
+            showToast('Error al cargar configuración', 'error');
         }
     };
 
-    const handleSaveAI = async () => {
-        setLoading(true);
+    const handleSaveGeminiKey = async () => {
+        setSaving(true);
         try {
-            await axios.put('/api/config', config);
-            setToast({ open: true, msg: 'Configuración AI guardada', severity: 'success' });
-            fetchParameters(); // Refrescar tabla ABM
+            await api.put('/config', { GEMINI_API_KEY: geminiKey });
+            setGeminiSaved(true);
+            showToast('✅ API Key de Gemini guardada correctamente');
         } catch (error) {
-            setToast({ open: true, msg: 'Error al guardar AI', severity: 'error' });
+            showToast('Error al guardar API Key', 'error');
         } finally {
-            setLoading(false);
+            setSaving(false);
         }
     };
 
-    const handleChange = (field, value) => {
-        setConfig(prev => ({ ...prev, [field]: value }));
-    };
-
-    const handleModelChange = (modelId) => {
-        setConfig(prev => ({
-            ...prev,
-            IA_CONFIG: {
-                ...prev.IA_CONFIG,
-                configuracion_ia: {
-                    ...prev.IA_CONFIG.configuracion_ia,
-                    modelo_por_defecto: modelId
-                }
-            }
-        }));
-        setToast({ open: true, msg: 'Modelo seleccionado. Guarda para aplicar.', severity: 'info' });
-    };
-
-    // --- LÓGICA ABM PARÁMETROS ---
+    // --- ABM Parámetros ---
     const handleOpenDialog = (param = null) => {
         if (param) {
-            setEditingParam(param);
+            setEditingParam({ parametro: param.parametro, valor: param.valor || '' });
             setIsNew(false);
         } else {
             setEditingParam({ parametro: '', valor: '' });
@@ -113,238 +87,298 @@ const SettingsPanel = () => {
 
     const handleSaveParam = async () => {
         try {
-            // Usamos un endpoint genérico o el mismo PUT /api/config con lógica dinámica
-            // Como server.js actual usa PUT /api/config con cuerpo específico, necesitamos actualizar server.js
-            // para soportar un endpoint genérico de ABM.
-            // Por ahora, asumiremos que implementaremos POST /api/parameters para crear/editar
-
-            await axios.post('/api/config/parameters', editingParam);
-
-            setToast({ open: true, msg: 'Parámetro guardado', severity: 'success' });
+            await api.post('/config/parameters', editingParam);
+            showToast('Parámetro guardado');
             setOpenDialog(false);
-            fetchParameters();
-            fetchConfig(); // Refrescar config AI también
+            fetchConfig();
         } catch (error) {
-            setToast({ open: true, msg: 'Error guardando parámetro', severity: 'error' });
+            showToast('Error guardando parámetro', 'error');
         }
     };
 
     const handleDeleteParam = async (key) => {
-        if (!window.confirm(`¿Eliminar parámetro ${key}?`)) return;
+        if (!window.confirm(`¿Eliminar parámetro "${key}"?`)) return;
         try {
-            await axios.delete(`/api/config/parameters/${key}`);
-            setToast({ open: true, msg: 'Parámetro eliminado', severity: 'success' });
-            fetchParameters();
+            await api.delete(`/config/parameters/${key}`);
+            showToast('Parámetro eliminado');
+            fetchConfig();
         } catch (error) {
-            setToast({ open: true, msg: 'Error eliminando parámetro', severity: 'error' });
+            showToast('Error eliminando parámetro', 'error');
         }
     };
 
-    // Aplanar modelos
-    const flattenModels = () => {
-        if (!config.IA_CONFIG?.configuracion_ia?.proveedores) return [];
-        const flattened = [];
-        const provs = config.IA_CONFIG.configuracion_ia.proveedores;
-        Object.keys(provs).forEach(key => {
-            const provider = provs[key];
-            if (provider.modelos && Array.isArray(provider.modelos)) {
-                provider.modelos.forEach(m => {
-                    flattened.push({
-                        value: m.modelo,
-                        label: `${provider.nombre_comercial} - ${m.nombre} (${m.modelo})`,
-                        providerKey: key
-                    });
-                });
-            }
-        });
-        return flattened;
+    const handleUploadTemplate = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('template', file);
+        try {
+            await api.post('/config/template', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            showToast('✅ Plantilla actualizada con éxito');
+        } catch (err) {
+            showToast('Error al subir plantilla', 'error');
+        }
     };
 
-    const modelOptions = flattenModels();
-    const currentModel = config.IA_CONFIG?.configuracion_ia?.modelo_por_defecto || '';
+    const showToast = (msg, severity = 'success') => {
+        setToast({ open: true, msg, severity });
+    };
 
     return (
-        <Paper sx={{ p: 4, mt: 4, width: '100%', maxWidth: 1000, mx: 'auto', borderRadius: 2 }}>
-            <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
-                Configuración del Sistema
-            </Typography>
+        <Box sx={{ width: '100%', maxWidth: 900, mx: 'auto' }}>
 
-            {/* SECCIÓN PLANTILLA WORD */}
-            <Paper elevation={3} sx={{ padding: 3, marginBottom: 4, border: '1px solid #ddd' }}>
-                <Typography variant="h6" gutterBottom color="primary">Plantilla de Presupuesto (Word)</Typography>
-                <Typography variant="body2" gutterBottom>
-                    Sube aquí tu archivo .docx base. Variables: <code>+++cliente+++</code>, <code>+++vehiculo+++</code> y bucle <code>+++detalles+++</code>.
+            {/* ── SECCIÓN: MI API KEY PERSONAL ───────────────────────── */}
+            <Paper sx={{
+                p: 3, mb: 3, borderRadius: 3,
+                border: '1px solid rgba(99,102,241,0.3)',
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(30,41,59,0.95) 100%)'
+            }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                    <Box sx={{
+                        p: 1, borderRadius: 1.5,
+                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                        display: 'flex', alignItems: 'center'
+                    }}>
+                        <KeyIcon sx={{ color: 'white', fontSize: 20 }} />
+                    </Box>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700}>Mi API Key de Gemini</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            Esta clave es privada y solo se usa para tus cotizaciones
+                        </Typography>
+                    </Box>
+                    {geminiSaved && (
+                        <Chip
+                            icon={<CheckCircleIcon />}
+                            label="Configurada"
+                            size="small"
+                            color="success"
+                            sx={{ ml: 'auto' }}
+                        />
+                    )}
+                </Box>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Obtén tu clave gratuita en{' '}
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer"
+                        style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 600 }}>
+                        Google AI Studio →
+                    </a>
                 </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 2 }}>
-                    <input
-                        accept=".docx"
-                        style={{ display: 'none' }}
-                        id="raised-button-file-template"
-                        type="file"
-                        onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                                const formData = new FormData();
-                                formData.append('template', file);
-                                axios.post('/api/config/template', formData)
-                                    .then(() => alert("Plantilla actualizada con éxito!"))
-                                    .catch(err => alert("Error al subir plantilla: " + err.message));
-                            }
-                        }}
-                    />
-                    <label htmlFor="raised-button-file-template">
-                        <Button variant="outlined" component="span" startIcon={<SaveIcon />}>
-                            Subir Plantilla .DOCX
-                        </Button>
-                    </label>
 
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                    <TextField
+                        id="gemini-api-key"
+                        label="Gemini API Key"
+                        type={showGemini ? 'text' : 'password'}
+                        value={geminiKey}
+                        onChange={e => setGeminiKey(e.target.value)}
+                        fullWidth
+                        placeholder="AIza..."
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <KeyIcon sx={{ color: '#6366f1', fontSize: 18 }} />
+                                </InputAdornment>
+                            ),
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <IconButton onClick={() => setShowGemini(!showGemini)} size="small">
+                                        {showGemini ? <VisibilityOff /> : <Visibility />}
+                                    </IconButton>
+                                </InputAdornment>
+                            ),
+                        }}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    />
                     <Button
-                        variant="text"
-                        color="primary"
-                        href="/api/config/template/sample"
-                        download="Plantilla_Ejemplo_Cotizador.docx"
-                        sx={{ ml: 2 }}
+                        id="save-gemini-key-btn"
+                        variant="contained"
+                        startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                        onClick={handleSaveGeminiKey}
+                        disabled={saving || !geminiKey}
+                        sx={{
+                            minWidth: 130, py: 1.7, borderRadius: 2,
+                            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                            fontWeight: 700, whiteSpace: 'nowrap',
+                            boxShadow: '0 4px 12px rgba(99,102,241,0.4)',
+                            '&:hover': { boxShadow: '0 6px 16px rgba(99,102,241,0.55)' }
+                        }}
                     >
-                        Descargar Plantilla Base (Ejemplo)
+                        {saving ? 'Guardando...' : 'Guardar Key'}
                     </Button>
                 </Box>
             </Paper>
 
-            {/* SECCIÓN AI */}
-            <Box sx={{ mb: 6, p: 3, border: '1px solid #444', borderRadius: 2 }}>
-                <Typography variant="h6" gutterBottom color="primary">Control de Inteligencia Artificial</Typography>
-                <Grid container spacing={3}>
-                    <Grid item xs={12}>
-                        {config.IA_CONFIG ? (
-                            <FormControl fullWidth>
-                                <InputLabel>Modelo Activo (Default)</InputLabel>
-                                <Select
-                                    value={currentModel}
-                                    label="Modelo Activo (Default)"
-                                    onChange={(e) => handleModelChange(e.target.value)}
-                                >
-                                    {modelOptions.map((opt) => (
-                                        <MenuItem key={opt.value} value={opt.value}>
-                                            {opt.label}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        ) : (
-                            <Alert severity="warning">Cargando configuración IA...</Alert>
-                        )}
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <TextField
-                            fullWidth
-                            label="Gemini API Key"
-                            type="password"
-                            value={config.GEMINI_API_KEY}
-                            onChange={(e) => handleChange('GEMINI_API_KEY', e.target.value)}
-                            InputLabelProps={{ shrink: true }}
-                        />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <TextField
-                            fullWidth
-                            label="OpenAI API Key"
-                            type="password"
-                            value={config.OPENAI_API_KEY}
-                            onChange={(e) => handleChange('OPENAI_API_KEY', e.target.value)}
-                            InputLabelProps={{ shrink: true }}
-                        />
-                    </Grid>
-                    <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <Button
-                            variant="contained"
-                            startIcon={<SaveIcon />}
-                            onClick={handleSaveAI}
-                            disabled={loading}
-                        >
-                            Guardar Config AI
-                        </Button>
-                    </Grid>
-                </Grid>
-            </Box>
-
-            <Divider sx={{ mb: 4 }} />
-
-            {/* SECCIÓN ABM PARÁMETROS */}
-            <Typography variant="h6" gutterBottom color="secondary">
-                Gestión Avanzada de Parámetros
-            </Typography>
-            <Button variant="outlined" startIcon={<AddIcon />} onClick={() => handleOpenDialog()} sx={{ mb: 2 }}>
-                Nuevo Parámetro
-            </Button>
-
-            <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>Clave (Parametro)</TableCell>
-                            <TableCell>Valor</TableCell>
-                            <TableCell align="right">Acciones</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {parameters.map((row) => (
-                            <TableRow key={row.parametro} hover>
-                                <TableCell sx={{ fontWeight: 'bold' }}>{row.parametro}</TableCell>
-                                <TableCell sx={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {row.valor && row.valor.length > 50 ? row.valor.substring(0, 50) + '...' : row.valor}
-                                </TableCell>
-                                <TableCell align="right">
-                                    <IconButton size="small" onClick={() => handleOpenDialog(row)}>
-                                        <EditIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton size="small" color="error" onClick={() => handleDeleteParam(row.parametro)}>
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
-
-            {/* DIALOGO ABM */}
-            <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>{isNew ? 'Nuevo Parámetro' : 'Editar Parámetro'}</DialogTitle>
-                <DialogContent>
-                    <Box sx={{ mt: 1 }}>
-                        <TextField
-                            fullWidth
-                            label="Nombre del Parámetro (Clave)"
-                            value={editingParam.parametro}
-                            onChange={(e) => setEditingParam({ ...editingParam, parametro: e.target.value })}
-                            disabled={!isNew} // Clave no editable si ya existe
-                            sx={{ mb: 3 }}
-                        />
-                        <TextField
-                            fullWidth
-                            label="Valor"
-                            value={editingParam.valor}
-                            onChange={(e) => setEditingParam({ ...editingParam, valor: e.target.value })}
-                            multiline
-                            rows={4}
-                        />
+            {/* ── SECCIÓN: PLANTILLA WORD ─────────────────────────────── */}
+            <Paper sx={{ p: 3, mb: 3, borderRadius: 3, border: '1px solid rgba(255,255,255,0.08)' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                    <Box sx={{
+                        p: 1, borderRadius: 1.5,
+                        background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                        display: 'flex', alignItems: 'center'
+                    }}>
+                        <DescriptionIcon sx={{ color: 'white', fontSize: 20 }} />
                     </Box>
+                    <Box>
+                        <Typography variant="h6" fontWeight={700}>Plantilla de Presupuesto</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            Archivo .docx base para generar cotizaciones
+                        </Typography>
+                    </Box>
+                </Box>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Variables disponibles: <code style={{ color: '#6366f1' }}>+++cliente+++</code>, <code style={{ color: '#6366f1' }}>+++vehiculo+++</code>, <code style={{ color: '#6366f1' }}>+++detalles+++</code>
+                </Typography>
+
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <input
+                        accept=".docx"
+                        style={{ display: 'none' }}
+                        id="template-upload-input"
+                        type="file"
+                        onChange={handleUploadTemplate}
+                    />
+                    <label htmlFor="template-upload-input">
+                        <Button
+                            variant="outlined"
+                            component="span"
+                            startIcon={<DescriptionIcon />}
+                            sx={{
+                                borderRadius: 2, borderColor: 'rgba(14,165,233,0.5)', color: '#0ea5e9',
+                                '&:hover': { borderColor: '#0ea5e9', background: 'rgba(14,165,233,0.08)' }
+                            }}
+                        >
+                            Subir Plantilla .DOCX
+                        </Button>
+                    </label>
+                    <Button
+                        variant="text"
+                        href="/api/config/template/sample"
+                        download="Plantilla_Ejemplo_Cotizador.docx"
+                        sx={{ color: 'text.secondary', borderRadius: 2 }}
+                    >
+                        Descargar Ejemplo
+                    </Button>
+                </Box>
+            </Paper>
+
+            {/* ── SECCIÓN: PARÁMETROS AVANZADOS ───────────────────────── */}
+            <Accordion
+                defaultExpanded={false}
+                sx={{
+                    borderRadius: '12px !important', border: '1px solid rgba(255,255,255,0.08)',
+                    background: 'rgba(30,41,59,0.7)', '&:before': { display: 'none' }
+                }}
+            >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <TuneIcon sx={{ color: '#6366f1', fontSize: 20 }} />
+                        <Box>
+                            <Typography variant="subtitle1" fontWeight={700}>Parámetros Avanzados</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                {parameters.length} parámetro{parameters.length !== 1 ? 's' : ''} configurado{parameters.length !== 1 ? 's' : ''}
+                            </Typography>
+                        </Box>
+                    </Box>
+                </AccordionSummary>
+
+                <AccordionDetails sx={{ pt: 0 }}>
+                    <Divider sx={{ mb: 2 }} />
+                    <Button
+                        id="new-param-btn"
+                        variant="outlined"
+                        size="small"
+                        startIcon={<AddIcon />}
+                        onClick={() => handleOpenDialog()}
+                        sx={{ mb: 2, borderRadius: 2 }}
+                    >
+                        Nuevo Parámetro
+                    </Button>
+
+                    {parameters.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                            No tienes parámetros adicionales configurados.
+                        </Typography>
+                    ) : (
+                        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 700 }}>Clave</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }}>Valor</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700 }}>Acciones</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {parameters.map((row) => (
+                                        <TableRow key={row.parametro} hover>
+                                            <TableCell sx={{ fontWeight: 600, color: '#6366f1', fontFamily: 'monospace' }}>
+                                                {row.parametro}
+                                            </TableCell>
+                                            <TableCell sx={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                                                {row.valor && row.valor.length > 60 ? row.valor.substring(0, 60) + '…' : row.valor}
+                                            </TableCell>
+                                            <TableCell align="right">
+                                                <IconButton size="small" onClick={() => handleOpenDialog(row)}>
+                                                    <EditIcon fontSize="small" />
+                                                </IconButton>
+                                                <IconButton size="small" color="error" onClick={() => handleDeleteParam(row.parametro)}>
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+                </AccordionDetails>
+            </Accordion>
+
+            {/* ── DIALOG ABM ──────────────────────────────────────────── */}
+            <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ fontWeight: 700 }}>
+                    {isNew ? 'Nuevo Parámetro' : 'Editar Parámetro'}
+                </DialogTitle>
+                <DialogContent>
+                    <TextField
+                        fullWidth label="Clave del Parámetro"
+                        value={editingParam.parametro}
+                        onChange={e => setEditingParam({ ...editingParam, parametro: e.target.value })}
+                        disabled={!isNew}
+                        sx={{ mb: 2, mt: 1 }}
+                        InputProps={{ style: { fontFamily: 'monospace' } }}
+                    />
+                    <TextField
+                        fullWidth label="Valor"
+                        value={editingParam.valor}
+                        onChange={e => setEditingParam({ ...editingParam, valor: e.target.value })}
+                        multiline rows={4}
+                        InputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                    />
                 </DialogContent>
-                <DialogActions>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
                     <Button onClick={() => setOpenDialog(false)}>Cancelar</Button>
-                    <Button onClick={handleSaveParam} variant="contained">Guardar</Button>
+                    <Button onClick={handleSaveParam} variant="contained" sx={{ borderRadius: 2 }}>
+                        Guardar
+                    </Button>
                 </DialogActions>
             </Dialog>
 
+            {/* ── SNACKBAR ────────────────────────────────────────────── */}
             <Snackbar
                 open={toast.open}
                 autoHideDuration={4000}
                 onClose={() => setToast({ ...toast, open: false })}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
-                <Alert severity={toast.severity}>{toast.msg}</Alert>
+                <Alert severity={toast.severity} sx={{ borderRadius: 2 }}>{toast.msg}</Alert>
             </Snackbar>
-        </Paper>
+        </Box>
     );
 };
 
