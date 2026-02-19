@@ -168,7 +168,7 @@ exports.downloadWord = async (req, res) => {
         // Preparar Datos para DocumentService
         const data = {
             cliente: quote.asegurado || '',
-            fecha: new Date(quote.createdAt).toLocaleDateString(),
+            fecha: new Date(quote.createdAt).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/-/g, '/'),
             vehiculo: quote.vehiculo || '',
             detalles: quote.detalles.map(d => ({
                 compania: d.compania,
