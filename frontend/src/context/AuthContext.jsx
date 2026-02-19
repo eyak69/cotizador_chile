@@ -11,24 +11,37 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('token');
         const storedUser = localStorage.getItem('user');
         if (token && storedUser) {
-            setUser(JSON.parse(storedUser));
+            try {
+                setUser(JSON.parse(storedUser));
+            } catch {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+            }
         }
         setLoading(false);
     }, []);
 
-    const login = async (username, password) => {
-        const res = await auth.login({ username, password });
-        localStorage.setItem('token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
-        setUser(res.data.user);
+    const setSession = (data) => {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setUser(data.user);
+    };
+
+    const login = async (email, password) => {
+        const res = await auth.login({ email, password });
+        setSession(res.data);
         return res.data;
     };
 
-    const register = async (username, password) => {
-        const res = await auth.register({ username, password });
-        localStorage.setItem('token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
-        setUser(res.data.user);
+    const register = async (email, password, displayName) => {
+        const res = await auth.register({ email, password, displayName });
+        setSession(res.data);
+        return res.data;
+    };
+
+    const googleLogin = async (credential) => {
+        const res = await auth.googleLogin({ credential });
+        setSession(res.data);
         return res.data;
     };
 
@@ -39,7 +52,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, register, googleLogin, logout, loading }}>
             {children}
         </AuthContext.Provider>
     );

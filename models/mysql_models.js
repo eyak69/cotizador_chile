@@ -97,14 +97,27 @@ const CorrectionRule = sequelize.define('CorrectionRule', {
 }, { tableName: 'correction_rules' });
 
 const User = sequelize.define('User', {
-  username: {
+  email: {
     type: DataTypes.STRING,
     allowNull: false,
     unique: true
   },
   password: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true  // null para usuarios que solo usan Google
+  },
+  displayName: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  googleId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
+  },
+  authProvider: {
+    type: DataTypes.STRING,
+    defaultValue: 'local'  // 'local' | 'google'
   },
   role: {
     type: DataTypes.STRING,

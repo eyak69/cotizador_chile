@@ -5,6 +5,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 router.post('/register', authController.register);
 router.post('/login', authController.login);
+router.post('/google', authController.googleAuth);  // <-- nuevo endpoint Google
 router.get('/me', authMiddleware, authController.me);
 
 module.exports = router;

@@ -1,28 +1,54 @@
-# Aprendizajes del Proyecto
+# Learning.md - Cotizador Chile
 
-- **Persistencia de Datos**: Siempre se debe agregar datos por medio de herramientas (scripts como `seed_prompts.js` o migraciones) para que quede documentado y se pueda recuperar en caso de reinicio de la base de datos.
-- **Diferencias Visuales en Docker**: Las fuentes "system-ui" varían drásticamente entre Windows y Linux (Docker). Para consistencia visual, siempre define fuentes web explícitas (e.g., 'Outfit', 'Roboto') en el CSS global (`:root` o `body`), evitando depender de las fuentes del sistema operativo.
-- **Docker en Monorepos**: Es CRÍTICO usar `**/node_modules` en `.dockerignore`. Si usas solo `node_modules`, las carpetas anidadas (ej: `frontend/node_modules`) se copiarán al contenedor, llevando binarios de Windows a Linux y rompiendo el build silenciosamente.
-- **Conflictos Legacy vs SPA**: Al migrar o coexistir con aplicaciones antiguas en Express, NUNCA uses `app.use(express.static('public'))` globalmente si esa carpeta contiene un `index.html` viejo. Express servirá ese archivo antes que tu aplicación React, ocultándola por completo.
-- **Manejo de Valores Falsy (0 vs null)**: En JavaScript, el número `0` se evalúa como falso. Al usar el operador OR (`||`) para asignar valores por defecto (ej: `val || default`), el `0` será reemplazado por el default, lo cual es incorrecto si `0` es un valor válido. Para evitar esto, utiliza Nullish Coalescing (`??`) en el frontend y validaciones explícitas de `undefined` en el backend.
-- **Inicialización Explícita de Servicios**: Importar un módulo de conexión a base de datos (e.g., `{ connectDB } = require('./database')`) NO ejecuta la conexión automáticamente. Siempre verifica que la función de inicialización se INVOQUE explícitamente al arranque del servidor (e.g., `connectDB()`).
-- **Robustez ante Filtros de Seguridad IA**: Al usar APIs generativas como Gemini, no asumas que siempre devolverán texto. Los filtros de seguridad ("Safety Filters") pueden bloquear la respuesta, resultando en `candidates` vacíos. Siempre verifica `response.candidates` antes de intentar extraer texto para evitar excepciones no controladas.
-- **Limpieza de Temporales**: Siempre eliminar archivos temporales (como versiones optimizadas de PDFs o imágenes recortadas) inmediatamente después de su uso para evitar el consumo innecesario de espacio en disco en entornos de producción.
-- **Generación de Word**: `Docxtemplater` + `PizZip` es superior a `docx-templates` por claridad de sintaxis (`{tag}`, `{#loop}`) y robustez en bucles complejos. Es fundamental validar que el archivo `.docx` de plantilla no tenga etiquetas XMl rotas internamente.
-- **Refactorización Monolito a Modular**: Separar la lógica en Servicios (`Service Layer`) y dejar los Controladores ligeros facilita el mantenimiento y la reutilización. Mover scripts sueltos a `scripts/utils/` mantiene la raíz limpia y organizada.
-- **UI Tablas Jerárquicas**: El patrón "Master-Detail" con filas colapsables en React/MUI evita la sobrecarga visual y permite acceder a detalles sin navegar a otra página o descargar archivos. La paginación y el ordenamiento descendente (más reciente primero) son claves para la usabilidad.
-- **Frontend API Layer**: Centralizar las llamadas a axios en un archivo `services/api.js` actúa como un SDK interno. Esto evita hardcodear URLs en componentes, permite interceptores globales de error y facilita el refactoring futuro.
-- **Backend Robustez**: Implementar un `Global Error Handler` como middleware asegura que ninguna excepción no controlada "cuelgue" el servidor, devolviendo siempre respuestas JSON estructuradas incluso ante fallos críticos.
-- **AdminService**: Centralizar la lógica de negocio administrativa (ABMs simples) en un servicio dedicado evita la dispersión de código en controladores y facilita la validación centralizada.
-- **Scripts NPM y Rutas**: Cuando defines un script en `package.json` (ej: `"init": "node scripts/utils/seed.js"`), el proceso de Node corre desde la raíz del proyecto. Sin embargo, los archivos ejecutados deben manejar sus imports asumiendo su propia ubicación física o usando rutas absolutas/alias. Si un script en `scripts/utils/` hace `require('./model')`, buscará en `scripts/utils/model`, lo cual suele ser incorrecto si los modelos están en la raíz. Usa `../../` o rutas absolutas.
-- **Docker Bind Mounts vs Imágenes**: Los volúmenes tipo "bind" (`./local:/container`) ocultan completamente el contenido original del directorio en el contenedor. Para preservar subcarpetas incluidas en la imagen (como `templates`), nunca montes el directorio padre completo; monta solo las subcarpetas específicas que requieren persistencia (`./local/temp:/container/temp`).
-- **Error EXDEV en Docker**: Mover archivos (`fs.rename`) entre un volumen Docker y una carpeta del sistema de archivos del contenedor falla porque se consideran dispositivos diferentes. La solución robusta es copiar el archivo (`fs.copyFile`) y luego eliminar el original (`fs.unlink`), en lugar de moverlo.
-- **Collation en MySQL Docker**: Las imágenes oficiales de MySQL suelen usar `latin1` por defecto. Si tu entorno local usa `utf8mb4` (estándar moderno), verás errores de codificación o diferencias con emojis. Fuerza UTF-8 en `docker-compose.yml` con `command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci`.
-- **Despliegue en Mac/Linux**: Los scripts `.sh` descargados desde repositorios en Windows a menudo pierden o no tienen permisos de ejecución. Siempre instruye al usuario a ejecutar `chmod +x script.sh` antes de usarlo. Además, Docker en Macs con Apple Silicon soporta imágenes `linux/amd64` transparentemente gracias a Rosetta 2.
-- **Navegación en React/MUI**: Para aplicaciones complejas, migrar de `Tabs` a un `Drawer` (Sidebar) permanente mejora significativamente la escalabilidad y experiencia de usuario. Requiere un layout `Flex` donde el sidebar es fijo y el contenido principal tiene `flexGrow: 1` para ocupar el espacio restante dinámicamente.
-- **Rastreo de Fuente en Documentos IA**: Al procesar documentos completos (multi-página) con LLMs, es fundamental solicitar explícitamente en el prompt la página de origen (`paginas_encontradas`) y, en el caso de texto plano (OpenAI), inyectar marcadores de página (`---[[PÁGINA X]]---`) durante la extracción del PDF para que el modelo pueda referenciar correctamente la ubicación de la información.
-- **Versionado Automático**: Antes de cada commit, SIEMPRE el asitente debe incrementar el número de versión (patch) en `package.json` AUTOMATICAMENTE para que el cliente sepa si su despliegue se actualizó.
-- **Actualización Cliente Docker**: Al usar `sequelize.sync({ alter: true })`, los cambios de esquema (nuevas columnas) se propagan automáticamente al contenedor del cliente tras un `docker-compose pull`, sin pérdida de datos, facilitando el despliegue continuo.
-- **Configuración Vite/PostCSS en Windows**: Si `vite` falla con `[plugin:vite:css] Failed to load PostCSS config ... Unexpected token '', "{ "name"...`, es probable que `package.json` tenga un BOM (Byte Order Mark) invisible o codificación incorrecta, ya que Vite intenta leerlo al buscar configuración de PostCSS. La solución es recrear el archivo con codificación UTF-8 pura o añadir un `postcss.config.js` explícito.
-- **Formato de Fechas y Localizaci�n (i18n)**: Al generar documentos (Word/PDF) en el servidor, 
-ew Date().toLocaleDateString() sin argumentos usa la configuraci�n regional del sistema operativo host (ej: en-US en Mac da mm/dd/yyyy). Para garantizar consistencia (ej: dd/mm/yyyy) independientemente del entorno (Docker, Windows, Mac), SIEMPRE especifica la localidad (es-CL) y las opciones ({ day: '2-digit'... }). Adem�s, para evitar ambig�edades entre guiones y barras, fuerza el reemplazo .replace(/-/g, '/') si el formato de negocio lo requiere.
+## 2026-02-19 - Conversión a Sistema Multiusuario con JWT
+
+### Qué se implementó
+Se convirtió la aplicación de monousuario a **multiusuario** con autenticación JWT.
+
+### Arquitectura de Autenticación
+- **`bcryptjs`**: Para encriptar contraseñas antes de guardarlas en la BD.
+- **`jsonwebtoken`**: Para generar tokens JWT con expiración de 24 horas.
+- **`authMiddleware.js`**: Valida el token en el header `Authorization: Bearer <token>` en cada ruta protegida.
+
+### Archivos Creados
+- `backend/middleware/authMiddleware.js` - Valida el JWT
+- `backend/controllers/authController.js` - register, login, me
+- `backend/routes/authRoutes.js` - POST /api/auth/login, /api/auth/register, GET /api/auth/me
+- `frontend/src/context/AuthContext.jsx` - Estado global de sesión para React
+- `frontend/src/pages/AuthPage.jsx` - UI de login/registro con diseño glassmorphism
+
+### Archivos Modificados
+- `models/mysql_models.js` - Nuevo modelo `User` y relación `User hasMany Cotizacion`
+- `backend/services/QuoteProcessingService.js` - `saveQuoteToDB` recibe `userId`
+- `backend/controllers/quoteController.js` - `getQuotes` filtra por `userId`, `deleteQuote` verifica ownership
+- `backend/controllers/uploadController.js` - Pasa `req.user.id` al guardar cotización
+- `backend/routes/*.js` - Todas las rutas protegidas con `authMiddleware`
+- `frontend/src/services/api.js` - Interceptor para enviar JWT automáticamente + manejo de expiración 401
+- `frontend/src/components/Sidebar.jsx` - Muestra usuario actual + botón logout
+- `frontend/src/App.jsx` - Si no hay sesión, muestra AuthPage
+- `frontend/src/main.jsx` - Envuelto con `<AuthProvider>`
+
+### Patrón de Datos de Usuario por Cotización
+- Cada `Cotizacion` tiene un campo `userId` que la vincula al usuario que la creó
+- `getQuotes` solo devuelve cotizaciones del usuario autenticado (`WHERE userId = req.user.id`)
+- `deleteQuote` verifica que `quote.userId === req.user.id` antes de eliminar
+
+### Lección sobre Sequelize sync({ alter: true })
+- Al agregar `User` y la FK `userId` en `Cotizacion`, Sequelize aplicará `ALTER TABLE` automáticamente al iniciar el servidor.
+- Las cotizaciones antiguas quedarán con `userId = NULL` (son históricos).
+
+### Configuración del Token
+```js
+// Duración: 24 horas
+jwt.sign({ id, username, role }, JWT_SECRET, { expiresIn: '1d' });
+// JWT_SECRET: variable de entorno, default 'secret_key_desarrollo'
+```
+
+### Branch Protection en GitHub
+- El repositorio tiene reglas de protección en `main` que impiden push directo.
+- Se necesita hacer PR desde una rama feature o configurar permisos con el administrador del repo.
+
+### Próximos pasos sugeridos
+1. Crear variable de entorno `JWT_SECRET` en el `.env` del servidor con un valor seguro.
+2. Considerar agregar panel de administración para gestionar usuarios.
+3. Opcionalmente agregar recuperación de contraseña por email.
