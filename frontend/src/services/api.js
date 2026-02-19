@@ -1,7 +1,5 @@
 import axios from 'axios';
 
-// Detectar base URL automáticamente (si estamos en dev con vite proxy: /, si no: /)
-// Axios permite configurar base URL relativa.
 const api = axios.create({
     baseURL: '/api',
     headers: {
@@ -9,21 +7,45 @@ const api = axios.create({
     }
 });
 
-// Interceptor para manejo de errores global (opcional pero recomendado)
+// Interceptor para agregar token JWT automáticamente a cada petición
+api.interceptors.request.use(
+    config => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        return config;
+    },
+    error => Promise.reject(error)
+);
+
+// Interceptor para manejo de errores global
 api.interceptors.response.use(
     response => response,
     error => {
         console.error("API Error:", error.response ? error.response.data : error.message);
+        // Si el token venció o es inválido, cerrar sesión
+        if (error.response && error.response.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.reload();
+        }
         return Promise.reject(error);
     }
 );
+
+export const auth = {
+    login: (data) => api.post('/auth/login', data),
+    register: (data) => api.post('/auth/register', data),
+    me: () => api.get('/auth/me'),
+};
 
 export const quotes = {
     getAll: () => api.get('/quotes'),
     getOne: (id) => api.get(`/quotes/${id}`),
     delete: (id) => api.delete(`/quotes/${id}`),
-    downloadExcel: (id) => `/api/quotes/${id}/excel`, // Helper para URL directa
-    downloadWord: (id) => `/api/quotes/${id}/word`   // Helper para URL directa
+    downloadExcel: (id) => `/api/quotes/${id}/excel`,
+    downloadWord: (id) => `/api/quotes/${id}/word`
 };
 
 export const config = {

@@ -9,22 +9,30 @@ import {
     Toolbar,
     Typography,
     Box,
-    Divider
+    Divider,
+    Avatar,
+    Tooltip,
+    IconButton
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import BusinessIcon from '@mui/icons-material/Business';
 import HistoryIcon from '@mui/icons-material/History';
 import SettingsIcon from '@mui/icons-material/Settings';
+import LogoutIcon from '@mui/icons-material/Logout';
 import axios from 'axios';
 import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const drawerWidth = 240;
 
 const Sidebar = ({ currentTab, onTabChange }) => {
     const [version, setVersion] = useState('');
+    const { user, logout } = useAuth();
 
     useEffect(() => {
-        axios.get('/api/config')
+        axios.get('/api/config', {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        })
             .then(res => {
                 if (res.data.system_version) setVersion(res.data.system_version);
             })
@@ -37,6 +45,8 @@ const Sidebar = ({ currentTab, onTabChange }) => {
         { text: 'Historial', icon: <HistoryIcon />, index: 2 },
         { text: 'Configuración', icon: <SettingsIcon />, index: 3 },
     ];
+
+    const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : '?';
 
     return (
         <Drawer
@@ -100,13 +110,52 @@ const Sidebar = ({ currentTab, onTabChange }) => {
                 </List>
             </Box>
 
+            {/* Usuario actual + Cerrar Sesión */}
+            <Box sx={{ mt: 'auto', p: 2 }}>
+                <Divider sx={{ mb: 2 }} />
+                <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    p: 1.5,
+                    borderRadius: 2,
+                    background: 'rgba(99,102,241,0.08)',
+                    border: '1px solid rgba(99,102,241,0.15)',
+                }}>
+                    <Avatar sx={{
+                        width: 34,
+                        height: 34,
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                    }}>
+                        {getInitials(user?.username)}
+                    </Avatar>
+                    <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
+                        <Typography variant="body2" fontWeight={600} color="white" noWrap>
+                            {user?.username}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            {user?.role === 'admin' ? 'Administrador' : 'Usuario'}
+                        </Typography>
+                    </Box>
+                    <Tooltip title="Cerrar Sesión">
+                        <IconButton
+                            id="logout-btn"
+                            size="small"
+                            onClick={logout}
+                            sx={{ color: 'text.secondary', '&:hover': { color: '#ec4899' } }}
+                        >
+                            <LogoutIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
 
-            <Box sx={{ mt: 'auto', p: 2, textAlign: 'center' }}>
-                <Typography variant="caption" sx={{ color: 'text.secondary', opacity: 0.7 }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', opacity: 0.5, display: 'block', textAlign: 'center', mt: 1.5 }}>
                     v{version || '...'}
                 </Typography>
             </Box>
-        </Drawer >
+        </Drawer>
     );
 };
 

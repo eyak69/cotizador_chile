@@ -50,7 +50,7 @@ exports.processUpload = async (req, res) => {
         }
 
         // 6. Guardar en DB
-        const nuevaCotizacion = await QuoteProcessingService.saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalFileName);
+        const nuevaCotizacion = await QuoteProcessingService.saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalFileName, req.user.id);
         console.log('Cotización guardada en MySQL ID:', nuevaCotizacion.id);
 
         const optimizationSuggestion = nuevaCotizacion.getDataValue('optimization_suggestion');

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const uploadController = require('../controllers/uploadController');
+const authMiddleware = require('../middleware/authMiddleware');
 const multer = require('multer');
 const path = require('path');
 
@@ -8,6 +9,6 @@ const path = require('path');
 const rootDir = path.resolve(__dirname, '..', '..');
 const upload = multer({ dest: path.join(rootDir, 'uploads', 'temp') });
 
-router.post('/', upload.single('pdfFile'), uploadController.processUpload);
+router.post('/', authMiddleware, upload.single('pdfFile'), uploadController.processUpload);
 
 module.exports = router;

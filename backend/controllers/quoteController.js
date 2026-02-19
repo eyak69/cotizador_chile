@@ -8,7 +8,9 @@ const getRootDir = () => path.resolve(__dirname, '..', '..');
 
 exports.getQuotes = async (req, res) => {
     try {
+        const userId = req.user.id;
         const quotes = await Cotizacion.findAll({
+            where: { userId },
             include: [{ model: DetalleCotizacion, as: 'detalles' }],
             order: [['createdAt', 'DESC']]
         });
@@ -22,11 +24,13 @@ exports.getQuotes = async (req, res) => {
 exports.deleteQuote = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user.id;
         const quote = await Cotizacion.findByPk(id, {
             include: [{ model: DetalleCotizacion, as: 'detalles' }]
         });
 
         if (!quote) return res.status(404).json({ error: "Cotización no encontrada" });
+        if (quote.userId !== userId) return res.status(403).json({ error: "No tienes permiso para eliminar esta cotización." });
 
         // 1. Eliminar archivos físicos asociados
         const rootDir = getRootDir();

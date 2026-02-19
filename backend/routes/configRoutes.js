@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const configController = require('../controllers/configController');
+const authMiddleware = require('../middleware/authMiddleware');
 const multer = require('multer');
 const path = require('path');
 
@@ -8,12 +9,12 @@ const path = require('path');
 const rootDir = path.resolve(__dirname, '..', '..');
 const upload = multer({ dest: path.join(rootDir, 'uploads', 'temp') });
 
-router.get('/', configController.getConfig);
-router.put('/', configController.updateConfig);
-router.post('/parameters', configController.saveParameter);
-router.delete('/parameters/:key', configController.deleteParameter);
+router.get('/', authMiddleware, configController.getConfig);
+router.put('/', authMiddleware, configController.updateConfig);
+router.post('/parameters', authMiddleware, configController.saveParameter);
+router.delete('/parameters/:key', authMiddleware, configController.deleteParameter);
 
-router.post('/template', upload.single('template'), configController.uploadTemplate);
-router.get('/template/sample', configController.downloadSampleTemplate);
+router.post('/template', authMiddleware, upload.single('template'), configController.uploadTemplate);
+router.get('/template/sample', authMiddleware, configController.downloadSampleTemplate);
 
 module.exports = router;

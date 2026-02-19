@@ -96,6 +96,22 @@ const CorrectionRule = sequelize.define('CorrectionRule', {
   }
 }, { tableName: 'correction_rules' });
 
+const User = sequelize.define('User', {
+  username: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true
+  },
+  password: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  role: {
+    type: DataTypes.STRING,
+    defaultValue: 'user'
+  }
+}, { tableName: 'users' });
+
 // Relación 1 a N
 Cotizacion.hasMany(DetalleCotizacion, { as: 'detalles' });
 DetalleCotizacion.belongsTo(Cotizacion);
@@ -104,4 +120,8 @@ DetalleCotizacion.belongsTo(Cotizacion);
 Empresa.hasMany(CorrectionRule, { foreignKey: 'empresa_id' });
 CorrectionRule.belongsTo(Empresa, { foreignKey: 'empresa_id' });
 
-module.exports = { Cotizacion, DetalleCotizacion, Empresa, Parametro, CorrectionRule };
+// Relación User - Cotizacion
+User.hasMany(Cotizacion, { foreignKey: 'userId' });
+Cotizacion.belongsTo(User, { foreignKey: 'userId' });
+
+module.exports = { Cotizacion, DetalleCotizacion, Empresa, Parametro, CorrectionRule, User };

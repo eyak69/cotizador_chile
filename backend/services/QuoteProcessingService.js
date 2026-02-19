@@ -174,7 +174,7 @@ class QuoteProcessingService {
         return await interpreterFunction(filePath, originalName, interpreterConfig);
     }
 
-    async saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalFileName) {
+    async saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalFileName, userId) {
         let nuevaCotizacion;
 
         if (loteId) {
@@ -189,7 +189,8 @@ class QuoteProcessingService {
             nuevaCotizacion = await Cotizacion.create({
                 asegurado: quoteData.asegurado,
                 vehiculo: quoteData.vehiculo,
-                loteId: loteId
+                loteId: loteId,
+                userId: userId || null
             });
         }
 
