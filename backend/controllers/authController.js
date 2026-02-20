@@ -166,13 +166,16 @@ exports.googleAuth = async (req, res) => {
             return res.status(400).json({ message: 'Token de Google requerido' });
         }
 
-        // Verificar el token con Google
-        const ticket = await googleClient.verifyIdToken({
-            idToken: credential,
-            audience: GOOGLE_CLIENT_ID,
+        // Verificar el token con Google usando el access_token enviado por frontend
+        const googleResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${credential}` }
         });
 
-        const payload = ticket.getPayload();
+        if (!googleResponse.ok) {
+            return res.status(401).json({ message: 'Token de Google inválido o expirado' });
+        }
+
+        const payload = await googleResponse.json();
         const { sub: googleId, email, name, picture } = payload;
 
         // Buscar usuario existente por googleId o email
