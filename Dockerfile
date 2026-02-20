@@ -12,6 +12,12 @@ RUN npm install
 # Copia el código fuente del frontend
 COPY frontend/ ./
 
+# --- INYECCIÓN DE VARIABLES ENV PARA VITE ---
+# Definimos los ARG que se pasarán desde el comando de build o con valor por defecto
+ARG VITE_GOOGLE_CLIENT_ID=172467646216-8987bcbjclmqt4hp0p5grjc89tfn7v7a.apps.googleusercontent.com
+# Convertimos el ARG en ENV para que npm run build / vite lo vea
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+
 # Compila el frontend (React/Vite) -> genera /app/frontend/dist
 RUN npm run build
 
