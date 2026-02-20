@@ -1,5 +1,22 @@
 # Learning.md - Cotizador Chile
 
+## 2026-02-20 - Troubeshooting Docker, Vite y Google Login (Coolify)
+
+### 1. Variables de Entorno en Vite (Frontend)
+- **Problema**: `import.meta.env.VITE_GOOGLE_CLIENT_ID` devolvía `undefined` en producción o local, causando un error 401 en el login de Google.
+- **Solución Errónea**: Intentar inyectarlo modificando `vite.config.js` para leer el `.env` del backend causaba fallos silenciosos en construcciones de Docker.
+- **Solución Correcta**: Crear un archivo `.env` dedicado dentro de la carpeta `/frontend` y usar la inyección nativa de Dockerfile (`ARG` y `ENV`) al compilar los estáticos (`npm run build`). Vite _exige_ que las variables existan en tiempo de construcción.
+
+### 2. Google Login: "Wrong number of segments in token"
+- **Problema**: El manejador OAuth de Google en backend (`verifyIdToken`) fallaba al recibir el token del frontend (`@react-oauth/google`) lanzando el error "Wrong number of segments".
+- **Causa**: El frontend moderno de React OAuth entrega un **Access Token** (cadena opaca corta), no un **ID Token** (JWT de 3 segmentos). La librería de auth de Node espera estrictamente un JWT.
+- **Solución**: En vez de decodificar criptográficamente, se reemplazó por un fetch directo al endpoint `https://www.googleapis.com/oauth2/v3/userinfo` pasándole el token en el Header `Authorization: Bearer`. Es más robusto y agnóstico del tipo de token.
+
+### 3. Docker Bind Mounts y Permisos de Directorios (Linux root)
+- **Problema**: En Coolify (producción), el frontend de React mostraba error o no generaba el reporte `.docx` de cada usuario (ej. `plantilla_presupuesto_3.docx`). En local sí andaba.
+- **Causa 1 (Volumen Faltante)**: Faltaba exponer el volumen compartido `/app/uploads/templates` hacia el host en el `docker-compose.coolify.yml`. Al reiniciarse el contenedor, las plantillas subidas se borraban.
+- **Causa 2 (Permisos Linux)**: Cuando se usa `bind mount` hacia `/opt/seguros/...`, Docker hereda los permisos exactos del directorio del Host. Si Node (interno al contenedor) intenta crear directorios `mkdirSync` y el host Linux los creó como `root`, Node falla por falta de permisos. *Lección*: Correr `chmod -R 777 /opt/seguros/uploads` en el servidor host resuelve esto de forma drástica, garantizando que el contenedor pueda escribir subcarpetas.
+
 ## 2026-02-20 - Despliegue en Coolify (Front + Back) sin MySQL
 
 ### Qué se implementó

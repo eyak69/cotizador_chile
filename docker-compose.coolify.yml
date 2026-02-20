@@ -31,6 +31,7 @@ services:
       # Volúmenes enlazados ("bind mounts") al directorio físico del servidor
       - /opt/seguros/uploads/temp:/app/uploads/temp
       - /opt/seguros/uploads/final:/app/uploads/final
+      - /opt/seguros/uploads/templates:/app/uploads/templates
       - /opt/seguros/logs:/app/logs
 
     # Se añade la inicialización normal de la app y el start
