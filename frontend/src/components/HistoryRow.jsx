@@ -9,6 +9,7 @@ import SimCardDownloadIcon from '@mui/icons-material/SimCardDownload';
 import DescriptionIcon from '@mui/icons-material/Description';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import { quotes as quotesService } from '../services/api';
 
 const HistoryRow = ({ row, onDelete, onDownloadExcel, onViewPdf }) => {
     const [open, setOpen] = useState(false);
@@ -51,10 +52,7 @@ const HistoryRow = ({ row, onDelete, onDownloadExcel, onViewPdf }) => {
 
                     <Tooltip title="Descargar Word">
                         <IconButton
-                            component="a"
-                            href={`/api/quotes/${row.id}/word`}
-                            target="_blank"
-                            download={`Presupuesto_${row.id}.docx`}
+                            onClick={() => quotesService.downloadWord(row.id)}
                             sx={{ mx: 1, color: '#2b579a' }}
                         >
                             <DescriptionIcon />

@@ -112,16 +112,24 @@ Auto de Reemplazo: Identifica el límite de 25 días y el copago de $5.000`
 async function seedCompanies() {
     console.log("🌱 Verificando/Creando Prompts Maestros (globales, userId=null)...");
     for (const data of companyPrompts) {
-        // Empresas globales de referencia (userId = null)
-        const [empresa, created] = await Empresa.findOrCreate({
-            where: { nombre: data.nombre, userId: null },
-            defaults: { ...data, userId: null }
-        });
+        try {
+            // Empresas globales de referencia (userId = null)
+            const [empresa, created] = await Empresa.findOrCreate({
+                where: { nombre: data.nombre, userId: null },
+                defaults: { ...data, userId: null }
+            });
 
-        if (!created) {
-            console.log(`⏭️  ${data.nombre} ya existe. Saltando.`);
-        } else {
-            console.log(`✨ Empresa plantilla creada: ${data.nombre}`);
+            if (!created) {
+                console.log(`⏭️  ${data.nombre} ya existe como global. Saltando.`);
+            } else {
+                console.log(`✨ Empresa plantilla creada: ${data.nombre}`);
+            }
+        } catch (error) {
+            if (error.name === 'SequelizeUniqueConstraintError') {
+                console.warn(`⚠️ Saltando seed de ${data.nombre}: Ya existe una empresa con este nombre (Restricción de Unicidad Global detectada en DB).`);
+            } else {
+                console.error(`❌ Error al seedear ${data.nombre}:`, error);
+            }
         }
     }
     console.log("✅ Seed completado.");

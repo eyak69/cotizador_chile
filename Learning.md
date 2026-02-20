@@ -1,5 +1,27 @@
 # Learning.md - Cotizador Chile
 
+## 2026-02-20 - Organización de Archivos por Usuario y Seguridad
+
+### Qué se implementó
+Se organizaron los archivos subidos y generados (PDFs, Excels, Words) en carpetas específicas por usuario para evitar conflictos y mejorar la privacidad en un entorno multiusuario.
+
+### Estructura de Carpetas
+- **Uploads Temporales**: `uploads/temp/{userId}/`
+  - Aquí llegan los PDFs subidos inicialmente.
+  - Aquí se generan los reportes temporales para descarga (Excel/Word).
+- **Archivos Finales**: `uploads/final/{userId}/`
+  - Aquí se mueven los PDFs procesados que quedan vinculados al historial.
+
+### Cambios Clave en Backend
+- **Multer Dinámico (`uploadRoutes.js`)**: Se configuró `diskStorage` con una función `destination` dinámica que usa `req.user.id` para determinar la carpeta de destino.
+  - *Lección Importante*: Recordar importar `fs` cuando se usa `fs.existsSync` dentro de la configuración de Multer, de lo contrario el servidor crashea al intentar subir un archivo.
+- **Servicios (`DocumentService.js`, `QuoteProcessingService.js`)**: Se actualizaron métodos como `generateExcel`, `generateWord` y `moveFileToFinal` para aceptar `userId` como parámetro y construir las rutas correspondientes.
+
+### Cambios Clave en Frontend
+- **Descargas Seguras (`api.js`)**: Se implementó `downloadFile` usando `responseType: 'blob'` y `window.URL.createObjectURL` para manejar descargas protegidas por JWT.
+- **Importaciones (`HistoryRow.jsx`)**: Se corrigió un error de sintaxis al importar servicios.
+  - *Lección*: Si `api.js` exporta `export const quotes = { ... }`, en otro archivo se debe importar como `import { quotes } from ...` o `import { quotes as anyName }`. No se puede importar `{ quotesService }` si no existe esa exportación nombrada.
+
 ## 2026-02-19 - Conversión a Sistema Multiusuario con JWT
 
 ### Qué se implementó

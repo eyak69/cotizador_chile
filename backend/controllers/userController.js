@@ -60,18 +60,18 @@ exports.createUser = async (req, res) => {
     }
 };
 
-// PUT /api/users/:id — actualizar rol (solo admin)
+// PUT /api/users/:id — actualizar rol y/o nombre (solo admin)
 exports.updateUser = async (req, res) => {
     try {
         const user = await User.findByPk(req.params.id);
         if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
 
-        // Solo permitir cambiar el rol
-        const { role } = req.body;
-        if (role) {
-            await user.update({ role: role === 'admin' ? 'admin' : 'user' });
-        }
-        res.json({ id: user.id, email: user.email, role: user.role });
+        const updates = {};
+        if (req.body.role) updates.role = req.body.role === 'admin' ? 'admin' : 'user';
+        if (req.body.displayName !== undefined) updates.displayName = req.body.displayName || null;
+
+        await user.update(updates);
+        res.json({ id: user.id, email: user.email, displayName: user.displayName, role: user.role });
     } catch (err) {
         console.error('Error actualizando usuario:', err);
         res.status(500).json({ message: 'Error al actualizar usuario' });

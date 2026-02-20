@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth } from '../services/api';
-import axios from 'axios';
+import api, { auth } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -21,7 +20,7 @@ export const AuthProvider = ({ children }) => {
             }
         }
         // Consultar si el registro está abierto (sin autenticación)
-        axios.get('/api/auth/status')
+        api.get('/auth/status')
             .then(res => setRegistrationOpen(res.data.open))
             .catch(() => setRegistrationOpen(false));
         setLoading(false);

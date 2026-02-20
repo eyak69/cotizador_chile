@@ -43,12 +43,29 @@ export const auth = {
         api.post('/auth/setup-password', { setupToken, newPassword }).then(r => r.data),
 };
 
+const downloadFile = async (url, filename) => {
+    try {
+        const response = await api.get(url, { responseType: 'blob' });
+        const urlBlob = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = urlBlob;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(urlBlob);
+    } catch (error) {
+        console.error("Download error:", error);
+        throw error;
+    }
+};
+
 export const quotes = {
     getAll: () => api.get('/quotes'),
     getOne: (id) => api.get(`/quotes/${id}`),
     delete: (id) => api.delete(`/quotes/${id}`),
-    downloadExcel: (id) => `/api/quotes/${id}/excel`,
-    downloadWord: (id) => `/api/quotes/${id}/word`
+    downloadExcel: (id) => downloadFile(`/quotes/${id}/excel`, `Cotizacion-${id}.xlsx`),
+    downloadWord: (id) => downloadFile(`/quotes/${id}/word`, `Presupuesto_${id}.docx`)
 };
 
 export const config = {

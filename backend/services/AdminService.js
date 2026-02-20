@@ -41,9 +41,15 @@ class AdminService {
     // ─── Configuración / Parámetros (por usuario) ─────────────────────────────
 
     async getConfig(userId) {
+        console.log(`[AdminService] Obteniendo configuración para userId: ${userId}`);
         const params = await Parametro.findAll({ where: { userId } });
+        console.log(`[AdminService] Parámetros encontrados en DB: ${params.length}`);
+
         const config = {};
-        params.forEach(p => config[p.parametro] = p.valor);
+        params.forEach(p => {
+            config[p.parametro] = p.valor;
+            // console.log(`   > ${p.parametro}: ${p.valor ? p.valor.substring(0, 20) + '...' : 'null'}`);
+        });
 
         // Versión del sistema
         try {
@@ -87,21 +93,36 @@ class AdminService {
 
     // ─── Templates (compartidos / por instancia de servidor) ──────────────────
 
-    moveTemplate(filePath) {
+    moveTemplate(filePath, userId) {
         const rootDir = getRootDir();
         const templateDir = path.join(rootDir, 'uploads', 'templates');
         if (!fs.existsSync(templateDir)) fs.mkdirSync(templateDir, { recursive: true });
 
-        const templatePath = path.join(templateDir, 'plantilla_presupuesto.docx');
+        // Si hay userId, guardamos con sufijo. Si no (admin global?), guardamos la default.
+        const fileName = userId ? `plantilla_presupuesto_${userId}.docx` : 'plantilla_presupuesto.docx';
+        const templatePath = path.join(templateDir, fileName);
+
         fs.copyFileSync(filePath, templatePath);
         fs.unlinkSync(filePath);
         return { message: 'Plantilla de presupuesto actualizada con éxito.' };
     }
 
-    getSampleTemplatePath() {
+    getSampleTemplatePath(userId) {
         const rootDir = getRootDir();
-        let templatePath = path.join(rootDir, 'uploads', 'doc', 'plantilla_ejemplo.docx');
+        const templateDir = path.join(rootDir, 'uploads', 'templates');
 
+        // 1. Intentar buscar la plantilla específica del usuario
+        if (userId) {
+            const userTemplate = path.join(templateDir, `plantilla_presupuesto_${userId}.docx`);
+            if (fs.existsSync(userTemplate)) return userTemplate;
+        }
+
+        // 2. Intentar buscar la plantilla default global (subida por alguien sin ID o legacy)
+        const defaultTemplate = path.join(templateDir, 'plantilla_presupuesto.docx');
+        if (fs.existsSync(defaultTemplate)) return defaultTemplate;
+
+        // 3. Fallback: Plantilla de ejemplo base del sistema
+        let templatePath = path.join(rootDir, 'uploads', 'doc', 'plantilla_ejemplo.docx');
         if (!fs.existsSync(templatePath)) {
             templatePath = path.join(rootDir, 'uploads', 'templates', 'ejemplo_base.docx');
         }

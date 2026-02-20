@@ -16,12 +16,30 @@ class DocumentService {
      * @param {string} outputName - Nombre del archivo de salida (sin path).
      * @returns {Promise<string>} - Ruta absoluta del archivo generado.
      */
-    async generateWord(data, templateName, outputName) {
+    async generateWord(data, templateName, outputName, userId = null) {
         const rootDir = getRootDir();
-        const templatePath = path.join(rootDir, 'uploads', 'templates', templateName);
+        const templatesDir = path.join(rootDir, 'uploads', 'templates');
+
+        let templatePath = path.join(templatesDir, templateName);
+
+        // Si tenemos userId, intentamos buscar la plantilla personalizada primero
+        if (userId) {
+            const userTemplateName = `plantilla_presupuesto_${userId}.docx`;
+            const userTemplatePath = path.join(templatesDir, userTemplateName);
+            if (fs.existsSync(userTemplatePath)) {
+                templatePath = userTemplatePath;
+                console.log(`[DocumentService] Usando plantilla personalizada para user ${userId}: ${templatePath}`);
+            }
+        }
 
         if (!fs.existsSync(templatePath)) {
-            throw new Error(`La plantilla ${templateName} no existe en /uploads/templates.`);
+            // Último intento: buscar la default si la que nos pasaron no existe (por si acaso templateName fuera diferente)
+            const defaultPath = path.join(templatesDir, 'plantilla_presupuesto.docx');
+            if (fs.existsSync(defaultPath)) {
+                templatePath = defaultPath;
+            } else {
+                throw new Error(`La plantilla no existe en /uploads/templates.`);
+            }
         }
 
         console.log(`[DocumentService] Usando plantilla: ${templatePath}`);
@@ -40,7 +58,7 @@ class DocumentService {
             compression: "DEFLATE",
         });
 
-        const tempDir = path.join(rootDir, 'uploads', 'temp');
+        const tempDir = path.join(rootDir, 'uploads', 'temp', userId ? String(userId) : 'anonymous');
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
         const outputPath = path.join(tempDir, outputName);
@@ -54,9 +72,10 @@ class DocumentService {
      * Genera un archivo Excel (.xlsx) con el detalle de la cotización.
      * @param {Object} quote - Objeto de cotización completo (con detalles).
      * @param {string} outputName - Nombre del archivo de salida.
+     * @param {string|number} userId - ID del usuario para organizar carpeta.
      * @returns {Promise<string>} - Ruta absoluta del archivo generado.
      */
-    async generateExcel(quote, outputName) {
+    async generateExcel(quote, outputName, userId = null) {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Cotización');
 
@@ -94,7 +113,7 @@ class DocumentService {
         worksheet.getRow(1).font = { bold: true };
 
         const rootDir = getRootDir();
-        const tempDir = path.join(rootDir, 'uploads', 'temp');
+        const tempDir = path.join(rootDir, 'uploads', 'temp', userId ? String(userId) : 'anonymous');
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
         const outputPath = path.join(tempDir, outputName);

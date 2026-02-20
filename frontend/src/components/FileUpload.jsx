@@ -5,7 +5,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import axios from 'axios';
+import api from '../services/api';
 import SparkMD5 from 'spark-md5';
 
 const FileUpload = ({ onQuoteProcessed }) => {
@@ -23,12 +23,12 @@ const FileUpload = ({ onQuoteProcessed }) => {
     const [suggestionData, setSuggestionData] = useState(null);
 
     React.useEffect(() => {
-        axios.get('/api/empresas')
+        api.get('/empresas')
             .then(res => setCompanies(res.data))
             .catch(err => console.error("Error cargando empresas:", err));
 
         // Cargar estado DEBUG (Opcional, desactivado para evitar 404 si no existe endpoint)
-        // axios.get('/api/parametros')...
+        // api.get('/parametros')...
     }, []);
 
     const calculateMD5 = (file) => {
@@ -149,7 +149,7 @@ const FileUpload = ({ onQuoteProcessed }) => {
                 formData.append('pdfFile', file);
                 if (file.companyId) formData.append('companyId', file.companyId);
 
-                const response = await axios.post('/api/upload', formData, {
+                const response = await api.post('/upload', formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
 
@@ -333,7 +333,7 @@ const FileUpload = ({ onQuoteProcessed }) => {
                     <Button
                         onClick={() => {
                             if (suggestionData) {
-                                axios.put(`/api/empresas/${suggestionData.companyId}`, {
+                                api.put(`/empresas/${suggestionData.companyId}`, {
                                     paginas_procesamiento: suggestionData.suggestedPages
                                 })
                                     .then(() => {

@@ -23,7 +23,7 @@ exports.processUpload = async (req, res) => {
 
         // Mover archivo final para historial (Siempre)
         const loteId = req.body.loteId;
-        const finalFileName = QuoteProcessingService.moveFileToFinal(req.file.path, req.file.originalname, loteId);
+        const finalFileName = QuoteProcessingService.moveFileToFinal(req.file.path, req.file.originalname, loteId, req.user.id);
 
         // Limpieza Temporales Condicional (Según DEBUG)
         if (!aiConfig.debugMode) {

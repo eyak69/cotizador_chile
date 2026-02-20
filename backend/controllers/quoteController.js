@@ -147,7 +147,7 @@ exports.downloadExcel = async (req, res) => {
 
         const fileName = `Cotizacion-${id}.xlsx`;
         // Delegar generación a DocumentService
-        const filePath = await DocumentService.generateExcel(quote, fileName);
+        const filePath = await DocumentService.generateExcel(quote, fileName, req.user.id);
 
         res.download(filePath, fileName, (err) => {
             if (err) console.error("Error descarga Excel:", err);
@@ -192,7 +192,7 @@ exports.downloadWord = async (req, res) => {
 
         const fileName = `Presupuesto_${id}.docx`;
         // Delegar generación a DocumentService
-        const filePath = await DocumentService.generateWord(data, 'plantilla_presupuesto.docx', fileName);
+        const filePath = await DocumentService.generateWord(data, 'plantilla_presupuesto.docx', fileName, req.user.id);
 
         res.download(filePath, fileName, (err) => {
             if (err) console.error("Error descarga Word:", err);

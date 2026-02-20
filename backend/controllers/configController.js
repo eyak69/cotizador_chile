@@ -47,11 +47,17 @@ exports.deleteParameter = async (req, res) => {
 };
 
 exports.uploadTemplate = (req, res) => {
+
     if (!req.file) {
         return res.status(400).json({ error: 'No se subió ningún archivo.' });
     }
+
+    if (!req.user || !req.user.id) {
+        return res.status(401).json({ error: 'Usuario no identificado correctamente.' });
+    }
+
     try {
-        const result = AdminService.moveTemplate(req.file.path);
+        const result = AdminService.moveTemplate(req.file.path, req.user.id);
         res.json(result);
     } catch (error) {
         console.error("Error subiendo plantilla:", error);
@@ -61,7 +67,7 @@ exports.uploadTemplate = (req, res) => {
 
 exports.downloadSampleTemplate = (req, res) => {
     try {
-        const templatePath = AdminService.getSampleTemplatePath();
+        const templatePath = AdminService.getSampleTemplatePath(req.user.id);
         res.download(templatePath, 'Plantilla_Ejemplo_Cotizador.docx');
     } catch (error) {
         res.status(404).json({ error: error.message });

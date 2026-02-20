@@ -46,12 +46,13 @@ const Empresa = sequelize.define('Empresa', {
   userId: { type: DataTypes.INTEGER, allowNull: true }      // FK al propietario
 }, { tableName: 'empresas' });
 
-// Parametro: PK numérico auto. Unique compuesto (parametro + userId)
+// Parametro: PK es ID auto-increment.
+// Unicidad real: (parametro, userId) para permitir que varios users tengan el mismo key 'IA_CONFIG'.
 const Parametro = sequelize.define('Parametro', {
   id: {
     type: DataTypes.INTEGER,
-    autoIncrement: true,
-    primaryKey: true
+    primaryKey: true,
+    autoIncrement: true
   },
   parametro: {
     type: DataTypes.STRING,
@@ -61,11 +62,17 @@ const Parametro = sequelize.define('Parametro', {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  userId: { type: DataTypes.INTEGER, allowNull: true }      // FK al propietario
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  }
 }, {
   tableName: 'parametros',
   indexes: [
-    { unique: true, fields: ['parametro', 'userId'] }      // unicidad por usuario
+    {
+      unique: true,
+      fields: ['parametro', 'userId']
+    }
   ]
 });
 

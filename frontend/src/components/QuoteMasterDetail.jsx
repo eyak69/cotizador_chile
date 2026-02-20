@@ -18,7 +18,7 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DescriptionIcon from '@mui/icons-material/Description';
-import axios from 'axios';
+import api, { quotes as quotesService } from '../services/api';
 import * as XLSX from 'xlsx';
 
 // Componente para una fila "Maestra" (Cotización)
@@ -28,13 +28,27 @@ function Row({ quote, onUpdate }) {
     const [changes, setChanges] = useState({});   // { [detalleId]: { plan: '...', ... } }
     const [learnChecks, setLearnChecks] = useState({}); // { [detalleId]: boolean }
 
-    const downloadExcel = (e) => {
+    const downloadExcel = async (e) => {
         e.stopPropagation();
         if (quote.id) {
-            // Usar el generador del servidor para consistencia con Historial
-            window.location.href = `/api/quotes/${quote.id}/excel`;
+            try {
+                await quotesService.downloadExcel(quote.id);
+            } catch (error) {
+                alert("Error al descargar Excel.");
+            }
         } else {
             alert("Esta cotización aún no tiene ID asignado. Intente recargar.");
+        }
+    };
+
+    const downloadWord = async (e) => {
+        e.stopPropagation();
+        if (quote.id) {
+            try {
+                await quotesService.downloadWord(quote.id);
+            } catch (error) {
+                alert("Error al descargar Word.");
+            }
         }
     };
 
@@ -62,7 +76,7 @@ function Row({ quote, onUpdate }) {
     const handleSave = async (id) => {
         try {
             const payload = { ...changes[id], learn: learnChecks[id] };
-            await axios.put(`/api/quote-details/${id}`, payload);
+            await api.put(`/quote-details/${id}`, payload);
             alert("Guardado correctamente" + (learnChecks[id] ? " y Aprendido!" : "."));
 
             setEditMode({ ...editMode, [id]: false });
@@ -87,9 +101,7 @@ function Row({ quote, onUpdate }) {
                         <IconButton
                             aria-label="download word"
                             size="small"
-                            href={`/api/quotes/${quote.id}/word`}
-                            target="_blank"
-                            download={`Presupuesto_${quote.id}.docx`}
+                            onClick={downloadWord}
                             sx={{ color: '#2b579a', marginLeft: 1 }} // Azul Word
                             title="Descargar Presupuesto Word"
                         >
@@ -266,7 +278,7 @@ export default function QuoteMasterDetail({ quotes: externalQuotes }) {
     const fetchQuotes = async () => {
         try {
             // En desarrollo local usamos proxy o ruta completa si no está configurado
-            const response = await axios.get('/api/quotes');
+            const response = await api.get('/quotes');
             setQuotes(response.data);
         } catch (error) {
             console.error("Error cargando historial:", error);

@@ -27,6 +27,10 @@ const SettingsPanel = () => {
     const [showGemini, setShowGemini] = useState(false);
     const [geminiSaved, setGeminiSaved] = useState(false);
 
+    // IA Configuration State
+    const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
+    const [iaConfig, setIaConfig] = useState({});
+
     // Gestión de parámetros avanzados (ABM)
     const [parameters, setParameters] = useState([]);
     const [openDialog, setOpenDialog] = useState(false);
@@ -47,6 +51,20 @@ const SettingsPanel = () => {
             setGeminiKey(data.GEMINI_API_KEY || '');
             setGeminiSaved(!!data.GEMINI_API_KEY);
 
+            // Parse and set IA Config
+            if (data.IA_CONFIG) {
+                try {
+                    const parsedConfig = typeof data.IA_CONFIG === 'string' ? JSON.parse(data.IA_CONFIG) : data.IA_CONFIG;
+                    setIaConfig(parsedConfig);
+                    // Extract existing model if available
+                    if (parsedConfig?.configuracion_ia?.modelo_por_defecto) {
+                        setSelectedModel(parsedConfig.configuracion_ia.modelo_por_defecto);
+                    }
+                } catch (e) {
+                    console.error("Error parsing IA_CONFIG", e);
+                }
+            }
+
             // Construir array de parámetros para la tabla ABM
             // Excluimos los que ya tienen sección propia
             const excludedKeys = ['GEMINI_API_KEY', 'OPENAI_API_KEY', 'system_version'];
@@ -60,14 +78,29 @@ const SettingsPanel = () => {
         }
     };
 
-    const handleSaveGeminiKey = async () => {
+    const handleSaveConfig = async () => {
         setSaving(true);
         try {
-            await api.put('/config', { GEMINI_API_KEY: geminiKey });
+            // Update IA Config object with new model
+            const updatedIaConfig = {
+                ...iaConfig,
+                configuracion_ia: {
+                    ...(iaConfig.configuracion_ia || {}),
+                    modelo_por_defecto: selectedModel
+                }
+            };
+
+            await api.put('/config', {
+                GEMINI_API_KEY: geminiKey,
+                IA_CONFIG: updatedIaConfig
+            });
+
             setGeminiSaved(true);
-            showToast('✅ API Key de Gemini guardada correctamente');
+            setIaConfig(updatedIaConfig);
+            showToast('✅ Configuración de IA guardada correctamente');
+            fetchConfig(); // Refresh parameters list if needed
         } catch (error) {
-            showToast('Error al guardar API Key', 'error');
+            showToast('Error al guardar configuración', 'error');
         } finally {
             setSaving(false);
         }
@@ -129,7 +162,7 @@ const SettingsPanel = () => {
     return (
         <Box sx={{ width: '100%', maxWidth: 900, mx: 'auto' }}>
 
-            {/* ── SECCIÓN: MI API KEY PERSONAL ───────────────────────── */}
+            {/* ── SECCIÓN: CONFIGURACIÓN IA (API KEY + MODELO) ───────────────────────── */}
             <Paper sx={{
                 p: 3, mb: 3, borderRadius: 3,
                 border: '1px solid rgba(99,102,241,0.3)',
@@ -144,9 +177,9 @@ const SettingsPanel = () => {
                         <KeyIcon sx={{ color: 'white', fontSize: 20 }} />
                     </Box>
                     <Box>
-                        <Typography variant="h6" fontWeight={700}>Mi API Key de Gemini</Typography>
+                        <Typography variant="h6" fontWeight={700}>Configuración de IA</Typography>
                         <Typography variant="caption" color="text.secondary">
-                            Esta clave es privada y solo se usa para tus cotizaciones
+                            Define tu API Key y el modelo de inteligencia artificial a utilizar
                         </Typography>
                     </Box>
                     {geminiSaved && (
@@ -168,48 +201,69 @@ const SettingsPanel = () => {
                     </a>
                 </Typography>
 
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                    <TextField
-                        id="gemini-api-key"
-                        label="Gemini API Key"
-                        type={showGemini ? 'text' : 'password'}
-                        value={geminiKey}
-                        onChange={e => setGeminiKey(e.target.value)}
-                        fullWidth
-                        placeholder="AIza..."
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <KeyIcon sx={{ color: '#6366f1', fontSize: 18 }} />
-                                </InputAdornment>
-                            ),
-                            endAdornment: (
-                                <InputAdornment position="end">
-                                    <IconButton onClick={() => setShowGemini(!showGemini)} size="small">
-                                        {showGemini ? <VisibilityOff /> : <Visibility />}
-                                    </IconButton>
-                                </InputAdornment>
-                            ),
-                        }}
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                    />
-                    <Button
-                        id="save-gemini-key-btn"
-                        variant="contained"
-                        startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
-                        onClick={handleSaveGeminiKey}
-                        disabled={saving || !geminiKey}
-                        sx={{
-                            minWidth: 130, py: 1.7, borderRadius: 2,
-                            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                            fontWeight: 700, whiteSpace: 'nowrap',
-                            boxShadow: '0 4px 12px rgba(99,102,241,0.4)',
-                            '&:hover': { boxShadow: '0 6px 16px rgba(99,102,241,0.55)' }
-                        }}
-                    >
-                        {saving ? 'Guardando...' : 'Guardar Key'}
-                    </Button>
-                </Box>
+                <Grid container spacing={2} alignItems="flex-start">
+                    <Grid item xs={12} md={7}>
+                        <TextField
+                            id="gemini-api-key"
+                            label="Gemini API Key"
+                            type={showGemini ? 'text' : 'password'}
+                            value={geminiKey}
+                            onChange={e => setGeminiKey(e.target.value)}
+                            fullWidth
+                            placeholder="AIza..."
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <KeyIcon sx={{ color: '#6366f1', fontSize: 18 }} />
+                                    </InputAdornment>
+                                ),
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton onClick={() => setShowGemini(!showGemini)} size="small">
+                                            {showGemini ? <VisibilityOff /> : <Visibility />}
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            }}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                        <TextField
+                            select
+                            label="Modelo IA"
+                            value={selectedModel}
+                            onChange={(e) => setSelectedModel(e.target.value)}
+                            fullWidth
+                            SelectProps={{ native: true }}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                        >
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recomendado)</option>
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                        </TextField>
+                    </Grid>
+                    <Grid item xs={12} md={2}>
+                        <Button
+                            id="save-gemini-key-btn"
+                            variant="contained"
+                            fullWidth
+                            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                            onClick={handleSaveConfig}
+                            disabled={saving} // Permitir guardar aunque no haya key si solo cambia modelo
+                            sx={{
+                                py: 1.7, borderRadius: 2,
+                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                fontWeight: 700, whiteSpace: 'nowrap',
+                                boxShadow: '0 4px 12px rgba(99,102,241,0.4)',
+                                '&:hover': { boxShadow: '0 6px 16px rgba(99,102,241,0.55)' },
+                                height: '56px' // Match textfield height
+                            }}
+                        >
+                            {saving ? '...' : 'Guardar'}
+                        </Button>
+                    </Grid>
+                </Grid>
             </Paper>
 
             {/* ── SECCIÓN: PLANTILLA WORD ─────────────────────────────── */}
@@ -230,9 +284,7 @@ const SettingsPanel = () => {
                     </Box>
                 </Box>
 
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Variables disponibles: <code style={{ color: '#6366f1' }}>+++cliente+++</code>, <code style={{ color: '#6366f1' }}>+++vehiculo+++</code>, <code style={{ color: '#6366f1' }}>+++detalles+++</code>
-                </Typography>
+
 
                 <Box sx={{ display: 'flex', gap: 2 }}>
                     <input
@@ -257,8 +309,25 @@ const SettingsPanel = () => {
                     </label>
                     <Button
                         variant="text"
-                        href="/api/config/template/sample"
-                        download="Plantilla_Ejemplo_Cotizador.docx"
+                        onClick={async () => {
+                            try {
+                                const response = await api.get('/config/template/sample', {
+                                    responseType: 'blob'
+                                });
+                                // Crear url del blob y forzar descarga
+                                const url = window.URL.createObjectURL(new Blob([response.data]));
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.setAttribute('download', 'Plantilla_Ejemplo_Cotizador.docx');
+                                document.body.appendChild(link);
+                                link.click();
+                                link.parentNode.removeChild(link);
+                                showToast('Descarga iniciada');
+                            } catch (error) {
+                                console.error("Error descarga plantilla:", error);
+                                showToast('Error al descargar plantilla', 'error');
+                            }
+                        }}
                         sx={{ color: 'text.secondary', borderRadius: 2 }}
                     >
                         Descargar Ejemplo
@@ -267,77 +336,79 @@ const SettingsPanel = () => {
             </Paper>
 
             {/* ── SECCIÓN: PARÁMETROS AVANZADOS ───────────────────────── */}
-            <Accordion
-                defaultExpanded={false}
-                sx={{
-                    borderRadius: '12px !important', border: '1px solid rgba(255,255,255,0.08)',
-                    background: 'rgba(30,41,59,0.7)', '&:before': { display: 'none' }
-                }}
-            >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <TuneIcon sx={{ color: '#6366f1', fontSize: 20 }} />
-                        <Box>
-                            <Typography variant="subtitle1" fontWeight={700}>Parámetros Avanzados</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                {parameters.length} parámetro{parameters.length !== 1 ? 's' : ''} configurado{parameters.length !== 1 ? 's' : ''}
-                            </Typography>
+            {user?.role === 'admin' && (
+                <Accordion
+                    defaultExpanded={false}
+                    sx={{
+                        borderRadius: '12px !important', border: '1px solid rgba(255,255,255,0.08)',
+                        background: 'rgba(30,41,59,0.7)', '&:before': { display: 'none' }
+                    }}
+                >
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <TuneIcon sx={{ color: '#6366f1', fontSize: 20 }} />
+                            <Box>
+                                <Typography variant="subtitle1" fontWeight={700}>Parámetros Avanzados</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    {parameters.length} parámetro{parameters.length !== 1 ? 's' : ''} configurado{parameters.length !== 1 ? 's' : ''}
+                                </Typography>
+                            </Box>
                         </Box>
-                    </Box>
-                </AccordionSummary>
+                    </AccordionSummary>
 
-                <AccordionDetails sx={{ pt: 0 }}>
-                    <Divider sx={{ mb: 2 }} />
-                    <Button
-                        id="new-param-btn"
-                        variant="outlined"
-                        size="small"
-                        startIcon={<AddIcon />}
-                        onClick={() => handleOpenDialog()}
-                        sx={{ mb: 2, borderRadius: 2 }}
-                    >
-                        Nuevo Parámetro
-                    </Button>
+                    <AccordionDetails sx={{ pt: 0 }}>
+                        <Divider sx={{ mb: 2 }} />
+                        <Button
+                            id="new-param-btn"
+                            variant="outlined"
+                            size="small"
+                            startIcon={<AddIcon />}
+                            onClick={() => handleOpenDialog()}
+                            sx={{ mb: 2, borderRadius: 2 }}
+                        >
+                            Nuevo Parámetro
+                        </Button>
 
-                    {parameters.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                            No tienes parámetros adicionales configurados.
-                        </Typography>
-                    ) : (
-                        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
-                            <Table size="small">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell sx={{ fontWeight: 700 }}>Clave</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Valor</TableCell>
-                                        <TableCell align="right" sx={{ fontWeight: 700 }}>Acciones</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {parameters.map((row) => (
-                                        <TableRow key={row.parametro} hover>
-                                            <TableCell sx={{ fontWeight: 600, color: '#6366f1', fontFamily: 'monospace' }}>
-                                                {row.parametro}
-                                            </TableCell>
-                                            <TableCell sx={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                                                {row.valor && row.valor.length > 60 ? row.valor.substring(0, 60) + '…' : row.valor}
-                                            </TableCell>
-                                            <TableCell align="right">
-                                                <IconButton size="small" onClick={() => handleOpenDialog(row)}>
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                                <IconButton size="small" color="error" onClick={() => handleDeleteParam(row.parametro)}>
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            </TableCell>
+                        {parameters.length === 0 ? (
+                            <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                                No tienes parámetros adicionales configurados.
+                            </Typography>
+                        ) : (
+                            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 700 }}>Clave</TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }}>Valor</TableCell>
+                                            <TableCell align="right" sx={{ fontWeight: 700 }}>Acciones</TableCell>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    )}
-                </AccordionDetails>
-            </Accordion>
+                                    </TableHead>
+                                    <TableBody>
+                                        {parameters.map((row) => (
+                                            <TableRow key={row.parametro} hover>
+                                                <TableCell sx={{ fontWeight: 600, color: '#6366f1', fontFamily: 'monospace' }}>
+                                                    {row.parametro}
+                                                </TableCell>
+                                                <TableCell sx={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                                                    {row.valor && row.valor.length > 60 ? row.valor.substring(0, 60) + '…' : row.valor}
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <IconButton size="small" onClick={() => handleOpenDialog(row)}>
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                    <IconButton size="small" color="error" onClick={() => handleDeleteParam(row.parametro)}>
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        )}
+                    </AccordionDetails>
+                </Accordion>
+            )}
 
             {/* ── DIALOG ABM ──────────────────────────────────────────── */}
             <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>

@@ -36,9 +36,13 @@ const HistoryPanel = () => {
         }
     };
 
-    const handleDownloadExcel = (id) => {
-        // Usar helper del servicio para obtener la URL
-        window.open(quotesService.downloadExcel(id), '_blank');
+    const handleDownloadExcel = async (id) => {
+        try {
+            await quotesService.downloadExcel(id);
+        } catch (error) {
+            console.error("Error al descargar Excel", error);
+            alert("Error al descargar el archivo Excel.");
+        }
     };
 
     const handleViewPdf = (ruta) => {

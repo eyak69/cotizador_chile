@@ -213,8 +213,9 @@ class QuoteProcessingService {
                 observaciones: typeof c.caracteristicas?.otros_beneficios === 'object' ? JSON.stringify(c.caracteristicas.otros_beneficios) : (c.caracteristicas?.otros_beneficios || null),
                 CotizacionId: nuevaCotizacion.id,
                 empresa_id: selectedEmpresa ? selectedEmpresa.id : null,
-                rutaArchivo: `/uploads/final/${finalFileName}`
-                // userId no necesario: hereda de Cotizacion
+                CotizacionId: nuevaCotizacion.id,
+                empresa_id: selectedEmpresa ? selectedEmpresa.id : null,
+                rutaArchivo: `/uploads/final/${userId}/${finalFileName}`
             }));
 
             const detallesAInsertar = [];
@@ -264,19 +265,15 @@ class QuoteProcessingService {
             }
         }
 
-        // Devolvemos la instancia y la sugerencia (hack: inyectamos la prop en el objeto instancia sequelize si es posible, o retornamos un objeto compuesto)
-        // Dado que return nuevaCotizacion se usa, y es un modelo Sequelize, mejor retornamos un objeto envuelto o adjuntamos como property "dataValues" extra si el controller lo espera.
-        // Pero el controller hace: const nuevaCotizacion = await ...saveQuoteToDB
-        // Modificaré el controller para esperar { cotizacion, suggestion } o adjuntarlo.
-        // Para no romper firmas, lo adjunto como propiedad no-persistente al objeto cotizacion.
+        // Devolvemos la instancia y la sugerencia
         nuevaCotizacion.setDataValue('optimization_suggestion', optimization_suggestion);
 
         return nuevaCotizacion;
     }
 
-    moveFileToFinal(tempPath, originalName, loteId) {
+    moveFileToFinal(tempPath, originalName, loteId, userId) {
         const rootDir = getRootDir();
-        const finalUploadDir = path.join(rootDir, 'uploads', 'final');
+        const finalUploadDir = path.join(rootDir, 'uploads', 'final', String(userId));
         if (!fs.existsSync(finalUploadDir)) fs.mkdirSync(finalUploadDir, { recursive: true });
 
         const prefix = loteId || Date.now();
