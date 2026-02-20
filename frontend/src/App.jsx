@@ -6,6 +6,7 @@ import QuoteMasterDetail from './components/QuoteMasterDetail';
 import CompanyManager from './components/CompanyManager';
 import HistoryPanel from './components/HistoryPanel';
 import SettingsPanel from './components/SettingsPanel';
+import UserManager from './components/UserManager';
 import Sidebar from './components/Sidebar';
 import AuthPage from './pages/AuthPage';
 import { useAuth } from './context/AuthContext';
@@ -89,7 +90,8 @@ function AppContent() {
           {currentTab === 0 && 'Panel de Cotización'}
           {currentTab === 1 && 'Gestión de Empresas'}
           {currentTab === 2 && 'Historial de Operaciones'}
-          {currentTab === 3 && 'Configuración Global'}
+          {currentTab === 3 && 'Configuración'}
+          {currentTab === 4 && user?.role === 'admin' && 'Usuarios del Sistema'}
         </Typography>
 
         <Box sx={{
@@ -113,6 +115,7 @@ function AppContent() {
           {currentTab === 1 && <CompanyManager />}
           {currentTab === 2 && <HistoryPanel />}
           {currentTab === 3 && <SettingsPanel />}
+          {currentTab === 4 && user?.role === 'admin' && <UserManager />}
         </Box>
       </Box>
     </Box>

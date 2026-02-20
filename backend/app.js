@@ -9,6 +9,7 @@ const quoteRoutes = require('./routes/quoteRoutes');
 const quoteDetailRoutes = require('./routes/quoteDetailRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 
@@ -32,9 +33,9 @@ app.use('/api/empresas', empresaRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/quote-details', quoteDetailRoutes);
-app.use('/api/quote-details', quoteDetailRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 
 // --- SERVIR FRONTEND ---
 const frontendDist = path.join(rootDir, 'frontend', 'dist');

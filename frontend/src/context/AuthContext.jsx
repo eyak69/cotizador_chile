@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth } from '../services/api';
+import axios from 'axios';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [registrationOpen, setRegistrationOpen] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -18,6 +20,10 @@ export const AuthProvider = ({ children }) => {
                 localStorage.removeItem('user');
             }
         }
+        // Consultar si el registro está abierto (sin autenticación)
+        axios.get('/api/auth/status')
+            .then(res => setRegistrationOpen(res.data.open))
+            .catch(() => setRegistrationOpen(false));
         setLoading(false);
     }, []);
 
@@ -28,21 +34,23 @@ export const AuthProvider = ({ children }) => {
     };
 
     const login = async (email, password) => {
-        const res = await auth.login({ email, password });
-        setSession(res.data);
-        return res.data;
+        const data = await auth.login({ email, password });
+        // Si el backend pide setup de contraseña, NO hacemos setSession
+        if (data.needsSetup) return data;
+        setSession(data);
+        return data;
     };
 
     const register = async (email, password, displayName) => {
-        const res = await auth.register({ email, password, displayName });
-        setSession(res.data);
-        return res.data;
+        const data = await auth.register({ email, password, displayName });
+        setSession(data);
+        return data;
     };
 
-    const googleLogin = async (credential) => {
-        const res = await auth.googleLogin({ credential });
-        setSession(res.data);
-        return res.data;
+    const googleLogin = async (payload) => {
+        const data = await auth.googleLogin(payload);
+        setSession(data);
+        return data;
     };
 
     const logout = () => {
@@ -52,7 +60,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, register, googleLogin, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, register, googleLogin, logout, loading, registrationOpen }}>
             {children}
         </AuthContext.Provider>
     );

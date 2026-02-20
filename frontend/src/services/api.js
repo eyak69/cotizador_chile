@@ -35,10 +35,12 @@ api.interceptors.response.use(
 );
 
 export const auth = {
-    login: (data) => api.post('/auth/login', data),
-    register: (data) => api.post('/auth/register', data),
-    googleLogin: (data) => api.post('/auth/google', data),
-    me: () => api.get('/auth/me'),
+    login: (data) => api.post('/auth/login', data).then(r => r.data),
+    register: (data) => api.post('/auth/register', data).then(r => r.data),
+    googleLogin: (data) => api.post('/auth/google', data).then(r => r.data),
+    me: () => api.get('/auth/me').then(r => r.data),
+    setupPassword: (setupToken, newPassword) =>
+        api.post('/auth/setup-password', { setupToken, newPassword }).then(r => r.data),
 };
 
 export const quotes = {

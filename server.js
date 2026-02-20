@@ -4,13 +4,15 @@ const { connectDB } = require('./database');
 const port = 3000;
 
 const seedCompanies = require('./backend/seeders/companySeeder');
+const seedAdminUser = require('./backend/seeders/adminSeeder');
 
 // Conexión a Base de Datos
 connectDB().then(async () => {
     // Ejecutar Seeder Automático
     try {
+        await seedAdminUser();
         await seedCompanies();
-        console.log("✅ Prompts iniciales cargados correctamente.");
+        console.log("✅ Seeders iniciales completados.");
     } catch (seedErr) {
         console.error("⚠️ Error corriendo seeder inicial:", seedErr);
     }
