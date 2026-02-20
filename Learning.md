@@ -109,3 +109,20 @@ jwt.sign({ id, username, role }, JWT_SECRET, { expiresIn: '1d' });
 1. Crear variable de entorno `JWT_SECRET` en el `.env` del servidor con un valor seguro.
 2. Considerar agregar panel de administración para gestionar usuarios.
 3. Opcionalmente agregar recuperación de contraseña por email.
+
+## 2026-02-20 - Clonación de Configuración del Administrador para Nuevos Usuarios
+
+### Qué se implementó
+Se agregó una funcionalidad para que, al crearse un nuevo usuario en la plataforma (tanto de forma manual por un administrador, como por auto-registro OAuth o local), el sistema automáticamente le copie la configuración base del administrador principal.
+
+### Detalles de la Implementación
+- **`UserSetupService.js`**: Nuevo servicio dedicado a buscar al administrador principal (basado en la variable de entorno `ADMIN_EMAIL` definida en `.env`) y clonar sus configuraciones para el nuevo usuario.
+- **Clonación de Empresas**: Se copian los registros de la tabla `Empresas` (nombre, prompt, páginas) asociados al admin para que el nuevo usuario tenga los prompts base ya cargados.
+- **Clonación de Parámetros**: Se copian todos los registros de la tabla `Parametros` del admin al nuevo usuario, con las siguientes reglas:
+  - Se remueve `MARGEN_DEFECTO` ya que no es aplicable a nuevos usuarios.
+  - Las variables sensibles como `GEMINI_API_KEY` y `OPENAI_API_KEY` se insertan vacías, de modo que el usuario quede obligado a completarlas en su configuración.
+- **Integración**: Se insertó el llamado al servicio posterior a la creación de registros en `userController.js` (creación manual por admin) y `authController.js` (registro y Google Auth).
+
+### Lecciones
+- Al clonar registros con Sequelize usando `bulkCreate()`, asegúrese de proyectar solo los campos deseados omitiendo los `id` originales, y asignando el nuevo `userId`.
+- No capturar errores del servicio de clonación hacia arriba previene que el fallo de la copia aborte la creación de la cuenta de usuario.
