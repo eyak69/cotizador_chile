@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    build: .
+    image: cfanton/cotizador-chile:coolify
     container_name: cotizador_app_coolify
     restart: unless-stopped
     ports:
