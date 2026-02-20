@@ -28,16 +28,11 @@ services:
       - PORT=3000
 
     volumes:
-      # Volúmenes para mantener la información de archivos subidos y logs
-      - cotizador_uploads:/app/uploads
-      - cotizador_logs:/app/logs
+      # Volúmenes enlazados ("bind mounts") al directorio físico del servidor
+      - /opt/seguros/uploads/temp:/app/uploads/temp
+      - /opt/seguros/uploads/final:/app/uploads/final
+      - /opt/seguros/logs:/app/logs
 
     # Se añade la inicialización normal de la app y el start
     command: >
       sh -c "npm run init && npm run start"
-
-volumes:
-  cotizador_uploads:
-    name: cotizador_app_uploads
-  cotizador_logs:
-    name: cotizador_app_logs
