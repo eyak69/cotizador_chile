@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: cotizador_app_coolify
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # --- Configuración de Base de Datos Externa (MySQL) ---
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_NAME=${DB_NAME}
+      - DB_DIALECT=mysql
+
+      # --- APIs y Claves ---
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+
+      # --- Configuración de la Aplicación ---
+      - REGISTRATION_OPEN=${REGISTRATION_OPEN:-false}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - PORT=3000
+
+    volumes:
+      # Volúmenes para mantener la información de archivos subidos y logs
+      - cotizador_uploads:/app/uploads
+      - cotizador_logs:/app/logs
+
+    # Se añade la inicialización normal de la app y el start
+    command: >
+      sh -c "npm run init && npm run start"
+
+volumes:
+  cotizador_uploads:
+    name: cotizador_app_uploads
+  cotizador_logs:
+    name: cotizador_app_logs

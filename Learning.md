@@ -1,5 +1,23 @@
 # Learning.md - Cotizador Chile
 
+## 2026-02-20 - Despliegue en Coolify (Front + Back) sin MySQL
+
+### Qué se implementó
+Se preparó la estructura para desplegar la aplicación en un servidor dedicado usando Coolify, aislando el frontend y backend de la base de datos MySQL (ya que esta ya existe de forma externa).
+
+### Archivos Creados
+- `docker-compose.coolify.yml`: Al no requerir la base de datos localmente, se creó este archivo especificando exclusivamente el servicio `app`.
+
+### Notas sobre Coolify Docker Compose
+- **Volúmenes**: Coolify maneja sus volúmenes, pero declararlos con persistencia de nombre (ej. `cotizador_uploads`) garantiza que al redesplegar, los archivos generados y PDFs subidos por usuarios persistan.
+- **Variables de Entorno**: Es fundamental inyectar `${DB_HOST}`, `${DB_USER}`, etc., en el compose y declararlas en la interfaz de Coolify, apuntando a la IP externa de MySQL (`192.168.192.102` en este caso).
+
+### Próximos pasos sugeridos
+1. Integrar el despliegue automático desde GitHub a Coolify.
+2. Considerar el uso de Nixpacks si se quiere evitar administrar manualmente el `docker-compose.coolify.yml`.
+
+
+
 ## 2026-02-20 - Organización de Archivos por Usuario y Seguridad
 
 ### Qué se implementó
