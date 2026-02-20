@@ -11,7 +11,9 @@ connectDB().then(async () => {
     // Ejecutar Seeder Automático
     try {
         await seedAdminUser();
-        await seedCompanies();
+        // Se deshabilita el seeder de empresas globales (userId: null) 
+        // ya que la configuración base ahora la provee el propio usuario administrador.
+        // await seedCompanies();
         console.log("✅ Seeders iniciales completados.");
     } catch (seedErr) {
         console.error("⚠️ Error corriendo seeder inicial:", seedErr);
