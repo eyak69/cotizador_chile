@@ -261,16 +261,25 @@ class QuoteProcessingService {
                 // Convertir a string formato "1,2,5" (o rangos si quisiéramos ser fancy, pero coma separada basta)
                 const suggestedPagesStr = sortedPages.join(',');
 
-                // Solo sugerir si lo encontrado es diferente a lo que la empresa ya tiene configurado,
-                // A MENOS que se esté forzando la sugerencia (ej. después de un reintento por fallo).
-                if (suggestedPagesStr && (forceOptimizationSuggestion || String(selectedEmpresa.paginas_procesamiento) !== suggestedPagesStr)) {
+                // Evaluamos si las páginas sugeridas están TODAS contenidas en la configuración actual.
+                const currentPagesStr = String(selectedEmpresa.paginas_procesamiento || '0');
+                const currentPagesArr = currentPagesStr.split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p));
+                const suggestedPagesArr = Array.from(allFoundPages);
+
+                // Si la empresa tiene '0' (todo el documento), o si hay alguna página sugerida que NO esté 
+                // en la configuración actual (ej: config es [3], sugerencia es [1]), entonces es "diferente"
+                // y amerita mostrar el popup.
+                const hasNewPages = currentPagesStr !== '0' && suggestedPagesArr.some(p => !currentPagesArr.includes(p));
+
+                // Solo sugerir si lo encontrado aporta páginas nuevas no configuradas, o si se forzó la sugerencia por fallo (isUfCero)
+                if (suggestedPagesStr && (forceOptimizationSuggestion || hasNewPages)) {
                     optimization_suggestion = {
                         companyId: selectedEmpresa.id,
                         companyName: selectedEmpresa.nombre,
                         currentPages: selectedEmpresa.paginas_procesamiento || '0',
                         suggestedPages: suggestedPagesStr,
                         message: `La IA detectó que la información útil de ${selectedEmpresa.nombre} se encuentra en las páginas ${suggestedPagesStr}.` +
-                            (forceOptimizationSuggestion && String(selectedEmpresa.paginas_procesamiento) === suggestedPagesStr ? `\n(Nota: Si estas páginas ya estaban configuradas, recomendamos guardar "0" para leer siempre el documento completo y evitar fallos).` : '')
+                            (forceOptimizationSuggestion && !hasNewPages ? `\n(Nota: Si estas páginas ya estaban configuradas, recomendamos guardar "0" para leer siempre el documento completo y evitar fallos).` : '')
                     };
                 }
             }
