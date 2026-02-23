@@ -165,3 +165,14 @@ Se reemplazaron todos los `window.confirm` nativos del navegador por componentes
 
 ### Lecciones
 - Para reemplazar un `window.confirm` sincrónico, es necesario desdoblar la lógica en 3 pasos: (1) Función que abre el modal y guarda en estado el ID del elemento a borrar, (2) Función de "Cancelar" que limpia el estado y cierra el modal, (3) Función de "Confirmar" asincrónica que ejecuta el borrado en la API, recarga los datos y cierra el modal.
+
+## 2026-02-23 - Reintento Automático de IA y Autosanación de Configuración
+
+### Qué se implementó
+Se agregó un mecanismo de seguridad y optimización en la subida de cotizaciones (`uploadController.js`). Si el usuario sube un PDF que está configurado para leer solo páginas específicas (ej: *"Páginas 1 y 2"*), pero la IA devuelve valores de primas en `$0` (UF 0), el sistema detecta este fallo asumiendo que el PDF generó la tabla en otra página no esperada. 
+
+Automáticamente, el backend "re-procesa" el mismo archivo pasándole la directiva `0` (procesar todo el documento original), haciendo una segunda petición a Gemini en el acto y guardando esa segunda respuesta exitosa de manera transparente (solo añadiendo el tiempo del re-scan).
+
+### Integración UI: Sugerencia Continua ("Magia")
+Al ejecutarse este "reintento por fallo", el backend sobrescribe temporalmente en memoria la propiedad `paginas_procesamiento` de la empresa y la setea a `"0"`. 
+Gracias a esto, el sistema de sugerencias de optimización que ya existía (el cual gatilla un modal UI cuando un documento entero es escaneado informando en qué páginas realmente estaba el dato numérico) también saltará en la pantalla del usuario tras un *reintento automático exitoso*. Así, el sistema se "sana" solo proponiendo al usuario guardar esas páginas correctas como predeterminadas.

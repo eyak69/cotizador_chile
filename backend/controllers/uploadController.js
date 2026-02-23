@@ -22,7 +22,40 @@ exports.processUpload = async (req, res) => {
         const aiConfig = await QuoteProcessingService.getAIConfiguration(req.user.id);
 
         // 4. Llamada IA
-        const quoteData = await QuoteProcessingService.processWithAI(pathForAI, req.file.originalname, aiConfig, selectedEmpresa);
+        let quoteData = await QuoteProcessingService.processWithAI(pathForAI, req.file.originalname, aiConfig, selectedEmpresa);
+
+        // --- REINTENTO AUTOMÁTICO SI HAY VALORES EN 0 ---
+        let isUfCero = false;
+        if (quoteData && quoteData.comparativa_seguros && quoteData.comparativa_seguros.length > 0) {
+            // Revisamos si alguna de las opciones arrojó $0 o UF 0 en todas sus primas (lo que indica que la IA no encontró la tabla)
+            isUfCero = quoteData.comparativa_seguros.some(opcion => {
+                const p3 = parseFloat(opcion.primas?.uf_3) || 0;
+                const p5 = parseFloat(opcion.primas?.uf_5) || 0;
+                const p10 = parseFloat(opcion.primas?.uf_10) || 0;
+                return (p3 + p5 + p10) === 0;
+            });
+        }
+
+        if (isUfCero && String(pagesToKeep) !== "0") {
+            console.log("🚨 ALERTA: La IA devolvió Prima UF = 0. Posible error de páginas cortadas (se esperaban valores en la página configurada). Iniciando REINTENTO con documento completo (páginas=0)...");
+
+            // Re-optimizar con configuración "0" (Todo el documento)
+            const retryOpt = await QuoteProcessingService.optimizePdf(req.file.path, "0", req.user.id, loteId);
+            const retryPathForAI = retryOpt.optimizedPath || req.file.path;
+
+            // Segunda llamada a la IA con el documento extendido
+            quoteData = await QuoteProcessingService.processWithAI(retryPathForAI, req.file.originalname, aiConfig, selectedEmpresa);
+
+            // MAGIA: Para emitir la "Sugerencia de Optimización" en la UI, simulamos en memoria
+            // que la empresa estaba configurada en "0" desde el inicio. Así el backend le dirá al
+            // frontend qué páginas son realmente útiles para guardarlas.
+            if (selectedEmpresa) {
+                selectedEmpresa.paginas_procesamiento = "0";
+            }
+
+            console.log("✅ Reintento de IA finalizado.");
+        }
+        // --- FIN REINTENTO ---
 
         // Mover archivo final para historial (Siempre)
         const finalRelativePath = await QuoteProcessingService.moveFileToFinal(req.file.path, req.file.originalname, loteId, req.user.id);
