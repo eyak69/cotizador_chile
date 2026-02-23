@@ -235,10 +235,9 @@ class QuoteProcessingService {
 
         // --- Lógica de Aprendizaje / Sugerencia de Optimización ---
         let optimization_suggestion = null;
-        const triggerSuggestion = forceOptimizationSuggestion || (selectedEmpresa && (selectedEmpresa.paginas_procesamiento === '0' || selectedEmpresa.paginas_procesamiento === 0 || !selectedEmpresa.paginas_procesamiento));
 
-        if (selectedEmpresa && triggerSuggestion) {
-            // Recolectar todas las páginas encontradas en este lote para esta empresa
+        if (selectedEmpresa) {
+            // Recolectar todas las páginas que la IA encontró en la respuesta
             const allFoundPages = new Set();
             if (quoteData.comparativa_seguros && quoteData.comparativa_seguros.length > 0) {
                 quoteData.comparativa_seguros.forEach(c => {
@@ -256,30 +255,32 @@ class QuoteProcessingService {
             }
 
             if (allFoundPages.size > 0) {
-                // Convertir a array ordenado
                 const sortedPages = Array.from(allFoundPages).sort((a, b) => a - b);
-                // Convertir a string formato "1,2,5" (o rangos si quisiéramos ser fancy, pero coma separada basta)
                 const suggestedPagesStr = sortedPages.join(',');
 
-                // Evaluamos si las páginas sugeridas están TODAS contenidas en la configuración actual.
+                // Paginas configuradas actualmente en la empresa (ej: "3" => [3], "1,2" => [1,2], "0" => [])
                 const currentPagesStr = String(selectedEmpresa.paginas_procesamiento || '0');
-                const currentPagesArr = currentPagesStr.split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p));
-                const suggestedPagesArr = Array.from(allFoundPages);
+                const currentPagesArr = currentPagesStr === '0'
+                    ? [] // '0' significa "todas", no lo comparamos
+                    : currentPagesStr.split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p));
 
-                // Si la empresa tiene '0' (todo el documento), o si hay alguna página sugerida que NO esté 
-                // en la configuración actual (ej: config es [3], sugerencia es [1]), entonces es "diferente"
-                // y amerita mostrar el popup.
-                const hasNewPages = currentPagesStr !== '0' && suggestedPagesArr.some(p => !currentPagesArr.includes(p));
+                // ¿Hay alguna página sugerida que NO esté en la configuración actual?
+                // Si la empresa usa "0" (todo el doc) no tiene sentido sugerir optimizar.
+                const hasNewPages = currentPagesStr !== '0' && Array.from(allFoundPages).some(p => !currentPagesArr.includes(p));
 
-                // Solo sugerir si lo encontrado aporta páginas nuevas no configuradas, o si se forzó la sugerencia por fallo (isUfCero)
-                if (suggestedPagesStr && (forceOptimizationSuggestion || hasNewPages)) {
+                // Disparar si:
+                //  A) Se forzó por fallo de reintento (isUfCero)
+                //  B) La IA encontró páginas que NO estaban en la config de la empresa
+                if (forceOptimizationSuggestion || hasNewPages) {
                     optimization_suggestion = {
                         companyId: selectedEmpresa.id,
                         companyName: selectedEmpresa.nombre,
-                        currentPages: selectedEmpresa.paginas_procesamiento || '0',
+                        currentPages: currentPagesStr,
                         suggestedPages: suggestedPagesStr,
-                        message: `La IA detectó que la información útil de ${selectedEmpresa.nombre} se encuentra en las páginas ${suggestedPagesStr}.` +
-                            (forceOptimizationSuggestion && !hasNewPages ? `\n(Nota: Si estas páginas ya estaban configuradas, recomendamos guardar "0" para leer siempre el documento completo y evitar fallos).` : '')
+                        message: `La IA detectó que la información útil de ${selectedEmpresa.nombre} se encuentra en las páginas ${suggestedPagesStr} (actualmente configuradas: ${currentPagesStr}).` +
+                            (forceOptimizationSuggestion && !hasNewPages
+                                ? `\n(Nota: La página ya estaba configurada pero falló al primer intento. Considera guardar "0" para leer siempre el documento completo.)`
+                                : '')
                     };
                 }
             }
