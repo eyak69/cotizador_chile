@@ -21,6 +21,8 @@ const FileUpload = ({ onQuoteProcessed }) => {
     // State for optimization suggestion
     const [suggestionOpen, setSuggestionOpen] = useState(false);
     const [suggestionData, setSuggestionData] = useState(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [fileToDelete, setFileToDelete] = useState(null);
 
     React.useEffect(() => {
         api.get('/empresas')
@@ -140,8 +142,22 @@ const FileUpload = ({ onQuoteProcessed }) => {
         });
     }, [companies]); // Agregamos 'companies' a dependencias para que el auto-match funcione
 
-    const removeFile = (md5ToRemove) => {
-        setFiles(files.filter(f => f.md5 !== md5ToRemove));
+    const handleDeleteClick = (md5) => {
+        setFileToDelete(md5);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDelete = () => {
+        if (fileToDelete) {
+            setFiles(files.filter(f => f.md5 !== fileToDelete));
+        }
+        setDeleteDialogOpen(false);
+        setFileToDelete(null);
+    };
+
+    const cancelDelete = () => {
+        setDeleteDialogOpen(false);
+        setFileToDelete(null);
     };
 
     const handleCompanyChange = (md5, companyId) => {
@@ -320,7 +336,7 @@ const FileUpload = ({ onQuoteProcessed }) => {
                                         <IconButton aria-label="preview" onClick={() => handlePreview(fileObj.file)} size="small" color="primary" sx={{ mr: 1 }}>
                                             <VisibilityIcon />
                                         </IconButton>
-                                        <IconButton aria-label="delete" onClick={() => removeFile(fileObj.md5)} size="small" color="error">
+                                        <IconButton aria-label="delete" onClick={() => handleDeleteClick(fileObj.md5)} size="small" color="error">
                                             <DeleteIcon />
                                         </IconButton>
                                     </TableCell>
@@ -425,6 +441,33 @@ const FileUpload = ({ onQuoteProcessed }) => {
                         autoFocus
                     >
                         Sí, optimizar
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Dialogo de Confirmación de Borrado de Archivo */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={cancelDelete}
+                PaperProps={{
+                    sx: {
+                        background: 'linear-gradient(135deg, #1e1e2f 0%, #151520 100%)',
+                        border: '1px solid rgba(168,85,247,0.3)',
+                        borderRadius: 3,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ color: '#fff', fontWeight: 800 }}>Quitar Archivo</DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ color: '#cbd5e1' }}>
+                        ¿Estás seguro de que deseas quitar este PDF de la lista de procesamiento?
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions sx={{ p: 3, pt: 0 }}>
+                    <Button onClick={cancelDelete} sx={{ color: '#94a3b8' }}>Cancelar</Button>
+                    <Button onClick={confirmDelete} variant="contained" color="error" sx={{ borderRadius: 2, fontWeight: 700 }}>
+                        Sí, Quitar
                     </Button>
                 </DialogActions>
             </Dialog>

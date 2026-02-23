@@ -3,7 +3,7 @@ import {
     Box, Paper, Typography, TextField, Button, Snackbar, Alert, Divider,
     Grid, CircularProgress, Chip, InputAdornment, IconButton, Accordion,
     AccordionSummary, AccordionDetails, Table, TableBody, TableCell,
-    TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions
+    TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -38,6 +38,8 @@ const SettingsPanel = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [editingParam, setEditingParam] = useState({ parametro: '', valor: '' });
     const [isNew, setIsNew] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [paramToDelete, setParamToDelete] = useState(null);
 
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState({ open: false, msg: '', severity: 'success' });
@@ -131,15 +133,28 @@ const SettingsPanel = () => {
         }
     };
 
-    const handleDeleteParam = async (key) => {
-        if (!window.confirm(`¿Eliminar parámetro "${key}"?`)) return;
+    const handleDeleteClick = (key) => {
+        setParamToDelete(key);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDeleteParam = async () => {
+        if (!paramToDelete) return;
         try {
-            await api.delete(`/config/parameters/${key}`);
+            await api.delete(`/config/parameters/${paramToDelete}`);
             showToast('Parámetro eliminado');
             fetchConfig();
         } catch (error) {
             showToast('Error eliminando parámetro', 'error');
+        } finally {
+            setDeleteDialogOpen(false);
+            setParamToDelete(null);
         }
+    };
+
+    const cancelDelete = () => {
+        setDeleteDialogOpen(false);
+        setParamToDelete(null);
     };
 
     const handleUploadTemplate = async (e) => {
@@ -398,6 +413,9 @@ const SettingsPanel = () => {
                                                     <IconButton size="small" onClick={() => handleOpenDialog(row)} sx={{ color: '#94a3b8' }}>
                                                         <EditIcon fontSize="small" />
                                                     </IconButton>
+                                                    <IconButton size="small" onClick={() => handleDeleteClick(row.parametro)} sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444' } }}>
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -457,6 +475,33 @@ const SettingsPanel = () => {
                     <Button onClick={() => setOpenDialog(false)} sx={{ color: '#94a3b8' }}>Cancelar</Button>
                     <Button onClick={handleSaveParam} variant="contained" sx={{ background: '#a855f7', color: '#fff', borderRadius: 2 }}>
                         Guardar
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Dialogo Confirmación Borrado Parámetro */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={cancelDelete}
+                PaperProps={{
+                    sx: {
+                        background: 'linear-gradient(135deg, #1e1e2f 0%, #151520 100%)',
+                        border: '1px solid rgba(244,63,94,0.3)',
+                        borderRadius: 3,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ color: '#fff', fontWeight: 800 }}>Confirmar Eliminación</DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ color: '#cbd5e1' }}>
+                        ¿Estás seguro de que deseas eliminar permanentemente el parámetro avanzado <b>{paramToDelete}</b>?
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions sx={{ p: 3, pt: 0 }}>
+                    <Button onClick={cancelDelete} sx={{ color: '#94a3b8' }}>Cancelar</Button>
+                    <Button onClick={confirmDeleteParam} variant="contained" color="error" sx={{ borderRadius: 2, fontWeight: 700 }}>
+                        Sí, Eliminar
                     </Button>
                 </DialogActions>
             </Dialog>

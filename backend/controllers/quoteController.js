@@ -56,27 +56,45 @@ exports.deleteQuote = async (req, res) => {
             });
         }
 
-        // 1b. Eliminar TODO el directorio del lote en la carpeta final y temporal si existen
+        // 1b. Eliminar archivos/carpetas asociados al lote (compatibilidad con viejo formato "123-" y nuevo formato "123/")
         if (quote.loteId) {
-            // Carpeta final
-            const finalUploadDir = path.join(rootDir, 'uploads', 'final', String(userId), String(quote.loteId));
-            if (fs.existsSync(finalUploadDir)) {
-                try {
-                    fs.rmSync(finalUploadDir, { recursive: true, force: true });
-                    console.log(`Directorio final asociado al lote eliminado: ${finalUploadDir}`);
-                } catch (dirErr) {
-                    console.error("Error eliminando directorio final del lote:", dirErr);
-                }
-            }
+            const finalBaseDir = path.join(rootDir, 'uploads', 'final', String(userId));
+            const tempBaseDir = path.join(rootDir, 'uploads', 'temp', String(userId));
 
-            // Carpeta temporal (por si acaso quedaron basuras)
-            const tempUploadDir = path.join(rootDir, 'uploads', 'temp', String(userId), String(quote.loteId));
-            if (fs.existsSync(tempUploadDir)) {
-                try {
-                    fs.rmSync(tempUploadDir, { recursive: true, force: true });
-                    console.log(`Directorio temporal asociado al lote eliminado: ${tempUploadDir}`);
-                } catch (dirErr) {
-                    console.error("Error eliminando directorio temporal del lote:", dirErr);
+            const dirsToCheck = [finalBaseDir, tempBaseDir];
+
+            for (const baseDir of dirsToCheck) {
+                if (fs.existsSync(baseDir)) {
+                    // Borrar el directorio con nombre loteId (nuevo formato)
+                    const loteFolder = path.join(baseDir, String(quote.loteId));
+                    if (fs.existsSync(loteFolder)) {
+                        try {
+                            fs.rmSync(loteFolder, { recursive: true, force: true });
+                            console.log(`Directorio de lote eliminado: ${loteFolder}`);
+                        } catch (e) {
+                            console.error(`Error eliminando directorio de lote ${loteFolder}:`, e);
+                        }
+                    }
+
+                    // Borrar archivos huérfanos con prefijo loteId (formato anterior)
+                    try {
+                        const files = fs.readdirSync(baseDir);
+                        files.forEach(file => {
+                            if (file.startsWith(quote.loteId + '-')) {
+                                const filePath = path.join(baseDir, file);
+                                if (fs.existsSync(filePath)) {
+                                    try {
+                                        fs.unlinkSync(filePath);
+                                        console.log(`Archivo residual de lote eliminado: ${filePath}`);
+                                    } catch (err) {
+                                        console.error(`Error eliminando archivo residual ${filePath}:`, err);
+                                    }
+                                }
+                            }
+                        });
+                    } catch (dirErr) {
+                        console.error(`Error leyendo directorio para limpieza residual ${baseDir}:`, dirErr);
+                    }
                 }
             }
         }

@@ -1,6 +1,7 @@
 const QuoteProcessingService = require('../services/QuoteProcessingService');
 const { Cotizacion, DetalleCotizacion } = require('../../models/mysql_models');
 const fs = require('fs');
+const path = require('path');
 
 exports.processUpload = async (req, res) => {
     try {
@@ -11,9 +12,11 @@ exports.processUpload = async (req, res) => {
         // 1. Identificar Empresa
         const { selectedEmpresa, pagesToKeep } = await QuoteProcessingService.identifyCompany(req.file.originalname, req.body.companyId, req.user.id);
 
+        const loteId = req.headers['x-lote-id'] || req.body.loteId;
+
         // 2. Optimizar PDF si es necesario
-        const { optimizedPath, wasOptimized } = await QuoteProcessingService.optimizePdf(req.file.path, pagesToKeep);
-        const pathForAI = optimizedPath;
+        const { optimizedPath, wasOptimized } = await QuoteProcessingService.optimizePdf(req.file.path, pagesToKeep, req.user.id, loteId);
+        const pathForAI = optimizedPath || req.file.path;
 
         // 3. Configuración IA
         const aiConfig = await QuoteProcessingService.getAIConfiguration(req.user.id);
@@ -22,24 +25,20 @@ exports.processUpload = async (req, res) => {
         const quoteData = await QuoteProcessingService.processWithAI(pathForAI, req.file.originalname, aiConfig, selectedEmpresa);
 
         // Mover archivo final para historial (Siempre)
-        const loteId = req.body.loteId;
-        const finalFileName = QuoteProcessingService.moveFileToFinal(req.file.path, req.file.originalname, loteId, req.user.id);
+        const finalRelativePath = await QuoteProcessingService.moveFileToFinal(req.file.path, req.file.originalname, loteId, req.user.id);
 
-        // Limpieza Temporales Condicional (Según DEBUG)
-        if (!aiConfig.debugMode) {
-            console.log("🧹 DEBUG=false: Limpiando archivos temporales...");
+        // Guardar la nueva cotización (se movió dentro de la DB la ruta final de MoveFileToFinal)
 
-            // Borrar PDF optimizado si se creó
-            if (wasOptimized && optimizedPath) {
-                fs.promises.unlink(optimizedPath).catch(e => console.error("Error borrando opt:", e.message));
+        // Limpieza de Temporales Incondicional (Solicitado por usuario)
+        console.log("🧹 Limpiando toda la carpeta temporal de este lote incondicionalmente...");
+        const tempDir = path.join(__dirname, '..', '..', 'uploads', 'temp', String(req.user.id), String(loteId));
+        if (fs.existsSync(tempDir)) {
+            try {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+                console.log(`Carpeta temporal eliminada: ${tempDir}`);
+            } catch (err) {
+                console.error(`Error borrando carpeta temp ${tempDir}:`, err.message);
             }
-
-            // Borrar PDF original subido (ya se movió copia a /final)
-            if (req.file && req.file.path) {
-                fs.promises.unlink(req.file.path).catch(e => console.error("Error borrando temp:", e.message));
-            }
-        } else {
-            console.log("🐞 DEBUG=true: Archivos temporales conservados en /uploads/temp/");
         }
 
 
@@ -50,7 +49,7 @@ exports.processUpload = async (req, res) => {
         }
 
         // 6. Guardar en DB
-        const nuevaCotizacion = await QuoteProcessingService.saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalFileName, req.user.id);
+        const nuevaCotizacion = await QuoteProcessingService.saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalRelativePath, req.user.id);
         console.log('Cotización guardada en MySQL ID:', nuevaCotizacion.id);
 
         const optimizationSuggestion = nuevaCotizacion.getDataValue('optimization_suggestion');

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Box, Typography, TextField, Button, IconButton,
-    Dialog, DialogTitle, DialogContent, DialogActions,
+    Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
     Snackbar, Alert, Chip, Avatar, CircularProgress,
     InputAdornment, Tooltip, Grid
 } from '@mui/material';
@@ -26,6 +26,8 @@ const UserManager = () => {
     const [showPass, setShowPass] = useState(false);
     const [newUser, setNewUser] = useState({ email: '', password: '', displayName: '', role: 'user' });
     const [creating, setCreating] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [userToDelete, setUserToDelete] = useState(null);
 
     // Edición inline de nombre
     const [editingId, setEditingId] = useState(null);
@@ -61,15 +63,28 @@ const UserManager = () => {
         } finally { setCreating(false); }
     };
 
-    const handleDeleteUser = async (id, email) => {
-        if (!window.confirm(`¿Eliminar el usuario "${email}"?`)) return;
+    const handleDeleteClick = (id, email) => {
+        setUserToDelete({ id, email });
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDeleteUser = async () => {
+        if (!userToDelete) return;
         try {
-            await api.delete(`/users/${id}`);
+            await api.delete(`/users/${userToDelete.id}`);
             showToast('Usuario eliminado');
             fetchUsers();
         } catch (err) {
             showToast(err.response?.data?.message || 'Error al eliminar usuario', 'error');
+        } finally {
+            setDeleteDialogOpen(false);
+            setUserToDelete(null);
         }
+    };
+
+    const cancelDelete = () => {
+        setDeleteDialogOpen(false);
+        setUserToDelete(null);
     };
 
     const handleToggleRole = async (user) => {
@@ -256,7 +271,7 @@ const UserManager = () => {
                                     </Box>
 
                                     {/* Delete Button */}
-                                    <IconButton size="small" onClick={() => handleDeleteUser(u.id, u.email)} sx={{ color: '#64748b', '&:hover': { color: '#ef4444' } }}>
+                                    <IconButton size="small" onClick={() => handleDeleteClick(u.id, u.email)} sx={{ color: '#64748b', '&:hover': { color: '#ef4444' } }}>
                                         <DeleteIcon sx={{ fontSize: 20 }} />
                                     </IconButton>
                                 </Box>
@@ -325,6 +340,34 @@ const UserManager = () => {
                         sx={{ borderRadius: 2, background: 'linear-gradient(135deg, #ec4899, #be185d)' }}
                     >
                         {creating ? 'Creando...' : 'Crear y Guardar'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Dialogo Confirmación Borrado Usuario */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={cancelDelete}
+                PaperProps={{
+                    sx: {
+                        background: 'linear-gradient(135deg, #1e1e2f 0%, #151520 100%)',
+                        border: '1px solid rgba(244,63,94,0.3)',
+                        borderRadius: 3,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ color: '#fff', fontWeight: 800 }}>Confirmar Eliminación</DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ color: '#cbd5e1' }}>
+                        ¿Estás seguro de que deseas eliminar permanentemente al usuario <b>{userToDelete?.email}</b>?
+                        Esta acción cortará su acceso al sistema inmediatamente.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions sx={{ p: 3, pt: 0 }}>
+                    <Button onClick={cancelDelete} sx={{ color: '#94a3b8' }}>Cancelar</Button>
+                    <Button onClick={confirmDeleteUser} variant="contained" color="error" sx={{ borderRadius: 2, fontWeight: 700 }}>
+                        Sí, Eliminar
                     </Button>
                 </DialogActions>
             </Dialog>

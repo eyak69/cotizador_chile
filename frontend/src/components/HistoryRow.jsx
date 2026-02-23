@@ -9,6 +9,7 @@ import SimCardDownloadIcon from '@mui/icons-material/SimCardDownload';
 import DescriptionIcon from '@mui/icons-material/Description';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { quotes as quotesService } from '../services/api';
 
 const HistoryRow = ({ row, onDelete, onDownloadExcel, onViewPdf }) => {
@@ -110,7 +111,16 @@ const HistoryRow = ({ row, onDelete, onDownloadExcel, onViewPdf }) => {
                             <Box key={detalleRow.id} sx={{ mb: 1.5, p: 1.5, borderLeft: '2px solid #a855f7', background: 'rgba(255,255,255,0.02)', borderRadius: '0 8px 8px 0' }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                                     <Typography variant="body2" fontWeight="bold" color="#fff">{detalleRow.compania}</Typography>
-                                    <Typography variant="caption" color="#cbd5e1" sx={{ background: 'rgba(255,255,255,0.1)', px: 1, borderRadius: 1 }}>{detalleRow.plan}</Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Typography variant="caption" color="#cbd5e1" sx={{ background: 'rgba(255,255,255,0.1)', px: 1, height: 'fit-content', borderRadius: 1 }}>{detalleRow.plan}</Typography>
+                                        {detalleRow.rutaArchivo && (
+                                            <Tooltip title="Ver PDF Original">
+                                                <IconButton size="small" onClick={() => onViewPdf(detalleRow.rutaArchivo)} sx={{ color: '#a855f7', p: 0.5, '&:hover': { background: 'rgba(168,85,247,0.1)' } }}>
+                                                    <VisibilityIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                    </Box>
                                 </Box>
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
                                     {detalleRow.prima_uf3 && <Chip size="small" label={`3UF: ${detalleRow.prima_uf3}`} sx={{ backgroundColor: 'rgba(255,255,255,0.05)', color: '#cbd5e1' }} />}

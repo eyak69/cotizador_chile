@@ -12,13 +12,8 @@ const rootDir = path.resolve(__dirname, '..', '..');
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const userId = req.user ? req.user.id : 'anonymous';
-        let userDir = path.join(rootDir, 'uploads', 'temp', String(userId));
-
-        // Extraer loteId de los headers ya que req.body no está disponible áun en destination
-        const loteId = req.headers['x-lote-id'];
-        if (loteId) {
-            userDir = path.join(userDir, loteId);
-        }
+        const loteId = req.headers['x-lote-id'] || Date.now().toString();
+        let userDir = path.join(rootDir, 'uploads', 'temp', String(userId), String(loteId));
 
         if (!fs.existsSync(userDir)) {
             fs.mkdirSync(userDir, { recursive: true });

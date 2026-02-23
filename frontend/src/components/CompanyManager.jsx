@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Box, Button, IconButton, Typography, Dialog, DialogTitle,
-    DialogContent, DialogActions, TextField, Snackbar, Alert, Tooltip, InputAdornment, Chip, Grid
+    DialogContent, DialogContentText, DialogActions, TextField, Snackbar, Alert, Tooltip, InputAdornment, Chip, Grid
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -16,6 +16,8 @@ const CompanyManager = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [currentEmpresa, setCurrentEmpresa] = useState({ nombre: '', prompt_reglas: '', paginas_procesamiento: "2" });
     const [isEditing, setIsEditing] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [companyToDelete, setCompanyToDelete] = useState(null);
     const [toast, setToast] = useState({ open: false, msg: '', severity: 'success' });
 
     useEffect(() => {
@@ -49,15 +51,28 @@ const CompanyManager = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('¿Seguro que deseas eliminar esta empresa?')) return;
+    const handleDeleteClick = (id) => {
+        setCompanyToDelete(id);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!companyToDelete) return;
         try {
-            await api.delete(`/empresas/${id}`);
+            await api.delete(`/empresas/${companyToDelete}`);
             showToast('Empresa eliminada correctamente');
             fetchEmpresas();
         } catch (error) {
             showToast('Error al eliminar empresa', 'error');
+        } finally {
+            setDeleteDialogOpen(false);
+            setCompanyToDelete(null);
         }
+    };
+
+    const cancelDelete = () => {
+        setDeleteDialogOpen(false);
+        setCompanyToDelete(null);
     };
 
     const openEdit = (empresa) => {
@@ -137,7 +152,7 @@ const CompanyManager = () => {
                                     <IconButton size="small" onClick={() => openEdit(emp)} sx={{ background: 'rgba(255,255,255,0.05)', color: '#cbd5e1', borderRadius: 2 }}>
                                         <EditIcon fontSize="small" />
                                     </IconButton>
-                                    <IconButton size="small" onClick={() => handleDelete(emp.id)} sx={{ background: 'rgba(255,255,255,0.05)', color: '#cbd5e1', borderRadius: 2 }}>
+                                    <IconButton size="small" onClick={() => handleDeleteClick(emp.id)} sx={{ background: 'rgba(255,255,255,0.05)', color: '#cbd5e1', borderRadius: 2 }}>
                                         <DeleteIcon fontSize="small" />
                                     </IconButton>
                                 </Box>
@@ -227,6 +242,32 @@ const CompanyManager = () => {
                 <DialogActions sx={{ p: 3, pt: 1 }}>
                     <Button onClick={() => setOpenDialog(false)} sx={{ color: '#94a3b8' }}>Cancelar</Button>
                     <Button onClick={handleSave} variant="contained" sx={{ borderRadius: 2, background: 'linear-gradient(135deg, #a855f7 0%, #3b82f6 100%)', fontWeight: 800 }}>Guardar</Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={cancelDelete}
+                PaperProps={{
+                    sx: {
+                        background: 'linear-gradient(135deg, #1e1e2f 0%, #151520 100%)',
+                        border: '1px solid rgba(168,85,247,0.3)',
+                        borderRadius: 3,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ color: '#fff', fontWeight: 800 }}>Confirmar Eliminación</DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ color: '#cbd5e1' }}>
+                        ¿Estás seguro de que deseas eliminar esta empresa? Todas sus configuraciones asociadas, incluidos los prompts, se perderán.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions sx={{ p: 3, pt: 0 }}>
+                    <Button onClick={cancelDelete} sx={{ color: '#94a3b8' }}>Cancelar</Button>
+                    <Button onClick={confirmDelete} variant="contained" color="error" sx={{ borderRadius: 2, fontWeight: 700 }}>
+                        Sí, Eliminar
+                    </Button>
                 </DialogActions>
             </Dialog>
 

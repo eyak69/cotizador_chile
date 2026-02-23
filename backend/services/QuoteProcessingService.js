@@ -38,7 +38,7 @@ class QuoteProcessingService {
         return { selectedEmpresa, pagesToKeep };
     }
 
-    async optimizePdf(filePath, pagesConfig) {
+    async optimizePdf(filePath, pagesConfig, userId, loteId) {
         const existingPdfBytes = fs.readFileSync(filePath);
         const pdfDoc = await PDFDocument.load(existingPdfBytes, { ignoreEncryption: true });
         const pageCount = pdfDoc.getPageCount();
@@ -104,7 +104,10 @@ class QuoteProcessingService {
             pages.forEach(page => newPdf.addPage(page));
 
             const pdfBytes = await newPdf.save();
-            optimizedPath = path.join(path.dirname(filePath), `opt_${path.basename(filePath)}`);
+            const tempDir = path.join(getRootDir(), 'uploads', 'temp', String(userId), String(loteId));
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+            optimizedPath = path.join(tempDir, `opt_${path.basename(filePath)}`);
             fs.writeFileSync(optimizedPath, pdfBytes);
             wasOptimized = true;
         } else {
@@ -216,7 +219,7 @@ class QuoteProcessingService {
                 // Y al final en saveQuoteToDB
                 CotizacionId: nuevaCotizacion.id,
                 empresa_id: selectedEmpresa ? selectedEmpresa.id : null,
-                rutaArchivo: finalRelativePath
+                rutaArchivo: finalFileName
             }));
 
             const detallesAInsertar = [];
@@ -278,10 +281,8 @@ class QuoteProcessingService {
         if (!fs.existsSync(finalUploadDir)) fs.mkdirSync(finalUploadDir, { recursive: true });
 
         const finalPath = path.join(finalUploadDir, originalName);
-
         fs.copyFileSync(tempPath, finalPath);
 
-        // Retornar la ruta relativa que se guardará en la base de datos
         return `/uploads/final/${userId}/${loteId}/${originalName}`;
     }
 }

@@ -150,3 +150,18 @@ La solución definitiva adoptada fue:
 2. En `uploadRoutes.js` (Multer), crear automáticamente un sub-directorio asociado a ese lote temporalmente (`uploads/temp/{userId}/{loteId}`).
 3. Al procesar final, la IA mueve los documentos a otro subdirectorio fijo `uploads/final/{userId}/{loteId}`.
 4. Al eliminar la cotización, `quoteController.js` ahora aplica `fs.rmSync(dir, { recursive: true })` tanto al directorio temporal como al final de ese lote específico, y borra todo el contenedor en una sola instruccion, lo que es inmensamente más seguro y limpio.
+
+## 2026-02-23 - Reemplazo de window.confirm nativo por MUI Dialogs
+
+### Qué se implementó
+Se reemplazaron todos los `window.confirm` nativos del navegador por componentes personalizados `<Dialog>` de Material-UI a lo largo de toda la aplicación, logrando una experiencia visual (UX) consistente con el diseño "glassmorphism" y modo oscuro generalizado.
+
+### Componentes Actualizados
+- `HistoryPanel.jsx`: Al eliminar una cotización completa del historial y sus archivos.
+- `FileUpload.jsx` (Cotizador): Al quitar un archivo PDF de la bandeja antes de procesar.
+- `UserManager.jsx`: Al eliminar permanentemente el acceso de un usuario.
+- `SettingsPanel.jsx`: Al eliminar parámetros avanzados de configuración del sistema.
+- `CompanyManager.jsx`: Al borrar una entidad aseguradora y sus prompts de IA asociados.
+
+### Lecciones
+- Para reemplazar un `window.confirm` sincrónico, es necesario desdoblar la lógica en 3 pasos: (1) Función que abre el modal y guarda en estado el ID del elemento a borrar, (2) Función de "Cancelar" que limpia el estado y cierra el modal, (3) Función de "Confirmar" asincrónica que ejecuta el borrado en la API, recarga los datos y cierra el modal.
