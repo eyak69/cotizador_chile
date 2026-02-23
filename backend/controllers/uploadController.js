@@ -46,13 +46,6 @@ exports.processUpload = async (req, res) => {
             // Segunda llamada a la IA con el documento extendido
             quoteData = await QuoteProcessingService.processWithAI(retryPathForAI, req.file.originalname, aiConfig, selectedEmpresa);
 
-            // MAGIA: Para emitir la "Sugerencia de Optimización" en la UI, simulamos en memoria
-            // que la empresa estaba configurada en "0" desde el inicio. Así el backend le dirá al
-            // frontend qué páginas son realmente útiles para guardarlas.
-            if (selectedEmpresa) {
-                selectedEmpresa.paginas_procesamiento = "0";
-            }
-
             console.log("✅ Reintento de IA finalizado.");
         }
         // --- FIN REINTENTO ---
@@ -81,8 +74,8 @@ exports.processUpload = async (req, res) => {
             return res.json(quoteData);
         }
 
-        // 6. Guardar en DB
-        const nuevaCotizacion = await QuoteProcessingService.saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalRelativePath, req.user.id);
+        // 6. Guardar en DB (Forzar sugerencia de mitigación si hubo reintento isUfCero)
+        const nuevaCotizacion = await QuoteProcessingService.saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalRelativePath, req.user.id, isUfCero);
         console.log('Cotización guardada en MySQL ID:', nuevaCotizacion.id);
 
         const optimizationSuggestion = nuevaCotizacion.getDataValue('optimization_suggestion');

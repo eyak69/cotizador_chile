@@ -182,7 +182,7 @@ class QuoteProcessingService {
         return await interpreterFunction(filePath, originalName, interpreterConfig);
     }
 
-    async saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalFileName, userId) {
+    async saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalFileName, userId, forceOptimizationSuggestion = false) {
         let nuevaCotizacion;
 
         if (loteId) {
@@ -235,7 +235,9 @@ class QuoteProcessingService {
 
         // --- Lógica de Aprendizaje / Sugerencia de Optimización ---
         let optimization_suggestion = null;
-        if (selectedEmpresa && (selectedEmpresa.paginas_procesamiento === '0' || selectedEmpresa.paginas_procesamiento === 0 || !selectedEmpresa.paginas_procesamiento)) {
+        const triggerSuggestion = forceOptimizationSuggestion || (selectedEmpresa && (selectedEmpresa.paginas_procesamiento === '0' || selectedEmpresa.paginas_procesamiento === 0 || !selectedEmpresa.paginas_procesamiento));
+
+        if (selectedEmpresa && triggerSuggestion) {
             // Recolectar todas las páginas encontradas en este lote para esta empresa
             const allFoundPages = new Set();
             if (quoteData.comparativa_seguros) {
@@ -256,8 +258,9 @@ class QuoteProcessingService {
                 // Convertir a string formato "1,2,5" (o rangos si quisiéramos ser fancy, pero coma separada basta)
                 const suggestedPagesStr = sortedPages.join(',');
 
-                // Solo sugerir si lo encontrado es algo específico (no vacío)
-                if (suggestedPagesStr) {
+                // Solo sugerir si lo encontrado es diferente a lo que la empresa ya tiene configurado
+                // Si la empresa ya estaba configurada en "1" y la IA encontró "1", no sugerir re-guardar "1".
+                if (suggestedPagesStr && String(selectedEmpresa.paginas_procesamiento) !== suggestedPagesStr) {
                     optimization_suggestion = {
                         companyId: selectedEmpresa.id,
                         companyName: selectedEmpresa.nombre,
