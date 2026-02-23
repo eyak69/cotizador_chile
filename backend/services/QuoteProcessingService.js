@@ -240,13 +240,16 @@ class QuoteProcessingService {
         if (selectedEmpresa && triggerSuggestion) {
             // Recolectar todas las páginas encontradas en este lote para esta empresa
             const allFoundPages = new Set();
-            if (quoteData.comparativa_seguros) {
+            if (quoteData.comparativa_seguros && quoteData.comparativa_seguros.length > 0) {
                 quoteData.comparativa_seguros.forEach(c => {
                     if (c.paginas_encontradas) {
                         const pages = Array.isArray(c.paginas_encontradas) ? c.paginas_encontradas : [c.paginas_encontradas];
                         pages.forEach(p => {
-                            const pNum = parseInt(p);
-                            if (!isNaN(pNum)) allFoundPages.add(pNum);
+                            const parts = String(p).split(',');
+                            parts.forEach(part => {
+                                const pNum = parseInt(part);
+                                if (!isNaN(pNum)) allFoundPages.add(pNum);
+                            });
                         });
                     }
                 });

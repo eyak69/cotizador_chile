@@ -1,4 +1,4 @@
-const { Cotizacion, DetalleCotizacion, Empresa } = require('./backend/models/mysql_models');
+const { Cotizacion, DetalleCotizacion, Empresa } = require('./models/mysql_models');
 (async () => {
     try {
         const lastQuotes = await Cotizacion.findAll({ order: [['id', 'DESC']], limit: 1, include: [{ model: DetalleCotizacion, as: 'detalles' }] });
@@ -15,11 +15,7 @@ const { Cotizacion, DetalleCotizacion, Empresa } = require('./backend/models/mys
 
         const forceOptimizationSuggestion = true; // Simulamos que hubo reintento
 
-        // AQUÍ ESTABA EL ERROR:
-        // const triggerSuggestion = forceOptimizationSuggestion || (selectedEmpresa && (selectedEmpresa.paginas_procesamiento === '0' || selectedEmpresa.paginas_procesamiento === 0 || !selectedEmpresa.paginas_procesamiento));
-
-        const triggerSuggestion = true; // For debug
-
+        let triggerSuggestion = true;
         let optimization_suggestion = null;
         if (selectedEmpresa && triggerSuggestion) {
             const allFoundPages = new Set();
