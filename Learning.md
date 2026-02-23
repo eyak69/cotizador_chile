@@ -173,6 +173,11 @@ Se agregó un mecanismo de seguridad y optimización en la subida de cotizacione
 
 Automáticamente, el backend "re-procesa" el mismo archivo pasándole la directiva `0` (procesar todo el documento original), haciendo una segunda petición a Gemini en el acto y guardando esa segunda respuesta exitosa de manera transparente (solo añadiendo el tiempo del re-scan).
 
-### Integración UI: Sugerencia Continua ("Magia")
-Al ejecutarse este "reintento por fallo", el backend sobrescribe temporalmente en memoria la propiedad `paginas_procesamiento` de la empresa y la setea a `"0"`. 
-Gracias a esto, el sistema de sugerencias de optimización que ya existía (el cual gatilla un modal UI cuando un documento entero es escaneado informando en qué páginas realmente estaba el dato numérico) también saltará en la pantalla del usuario tras un *reintento automático exitoso*. Así, el sistema se "sana" solo proponiendo al usuario guardar esas páginas correctas como predeterminadas.
+### Integración UI: Sugerencia de Optimización - Bug y Fix
+Al principio se intentó disparar la sugerencia al "mutar" en memoria `selectedEmpresa.paginas_procesamiento = "0"`. Esto **no funciona** porque Sequelize maneja internamente sus instancias y no refleja mutaciones directas de propiedades en las evaluaciones posteriores.
+
+**Solución correcta:** Se pasó un flag explícito `forceOptimizationSuggestion = true` como parámetro a `saveQuoteToDB()` cuando hay reintento (`isUfCero = true`).
+
+**Segundo bug encontrado:** La condición de entrada al bloque de sugerencia evaluaba `triggerSuggestion` basándose en si `paginas_procesamiento === '0'`. Esto excluía completamente el bloque cuando la empresa tenía páginas configuradas (ej: `"3"`), por lo que `hasNewPages` nunca se calculaba.
+
+**Fix definitivo en `QuoteProcessingService.js`:** Se eliminó la guarda `triggerSuggestion` del outer `if`, dejando que siempre entre al bloque si hay `selectedEmpresa`. Dentro, `hasNewPages` compara las páginas retornadas por la IA (`paginas_encontradas`) con las páginas numéricas configuradas en la empresa (`currentPagesArr`). Si alguna página encontrada no está en la config, se dispara el popup. Esto cubre ambos casos: reintento forzado (UF=0) y detección pasiva de páginas no configuradas.
