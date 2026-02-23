@@ -258,15 +258,16 @@ class QuoteProcessingService {
                 // Convertir a string formato "1,2,5" (o rangos si quisiéramos ser fancy, pero coma separada basta)
                 const suggestedPagesStr = sortedPages.join(',');
 
-                // Solo sugerir si lo encontrado es diferente a lo que la empresa ya tiene configurado
-                // Si la empresa ya estaba configurada en "1" y la IA encontró "1", no sugerir re-guardar "1".
-                if (suggestedPagesStr && String(selectedEmpresa.paginas_procesamiento) !== suggestedPagesStr) {
+                // Solo sugerir si lo encontrado es diferente a lo que la empresa ya tiene configurado,
+                // A MENOS que se esté forzando la sugerencia (ej. después de un reintento por fallo).
+                if (suggestedPagesStr && (forceOptimizationSuggestion || String(selectedEmpresa.paginas_procesamiento) !== suggestedPagesStr)) {
                     optimization_suggestion = {
                         companyId: selectedEmpresa.id,
                         companyName: selectedEmpresa.nombre,
                         currentPages: selectedEmpresa.paginas_procesamiento || '0',
                         suggestedPages: suggestedPagesStr,
-                        message: `La IA detectó que la información útil de ${selectedEmpresa.nombre} se encuentra en las páginas ${suggestedPagesStr}.`
+                        message: `La IA detectó que la información útil de ${selectedEmpresa.nombre} se encuentra en las páginas ${suggestedPagesStr}.` +
+                            (forceOptimizationSuggestion && String(selectedEmpresa.paginas_procesamiento) === suggestedPagesStr ? `\n(Nota: Si estas páginas ya estaban configuradas, recomendamos guardar "0" para leer siempre el documento completo y evitar fallos).` : '')
                     };
                 }
             }
