@@ -10,7 +10,11 @@ module.exports = (req, res, next) => {
     try {
         // Si el token viene con 'Bearer ', se elimina
         const cleanToken = token.startsWith('Bearer ') ? token.slice(7, token.length) : token;
-        const decoded = jwt.verify(cleanToken, process.env.JWT_SECRET || 'secret_key_desarrollo');
+        const secret = process.env.JWT_SECRET;
+        if (!secret) {
+            console.error("⚠️ CRÍTICO: JWT_SECRET no está definido.");
+        }
+        const decoded = jwt.verify(cleanToken, secret || 'secret_key_desarrollo');
         req.user = decoded;
         next();
     } catch (ex) {

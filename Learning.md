@@ -143,5 +143,10 @@ Se agregó una funcionalidad para que, al crearse un nuevo usuario en la platafo
 ### Qué se implementó
 Se mejoró la lógica de eliminación de cotizaciones en `quoteController.js`. Anteriormente solo se eliminaban los archivos cuyas rutas exactas estaban guardadas en `DetalleCotizacion`. Ahora, además de eso, el sistema busca activamente en el directorio de subidas finales (`uploads/final/{userId}`) todos los archivos que comiencen con el prefijo del `loteId` de la cotización y los elimina de forma forzada.
 
-### Por qué
-Esto asegura que la eliminación de una entrada desde la interfaz de historial limpie **absolutamente todos** los archivos asociados a dicho lote (archivos subidos originalmente, documentos procesados, y cualquier archivo que hubiera quedado huérfano si la extracción de datos fallara parcial o totalmente), garantizando que no queden "archivos basura" ocupando disco en el servidor.
+### Evolución a Sistema de Carpetas por Lote
+Posteriormente, se observó que nombrar los archivos con prefijo (`1234-archivo.pdf`) generaba problemas si los procesos morían tempranamente en la subida, dejando basura en `uploads/temp`.
+La solución definitiva adoptada fue:
+1. En el frontend, enviar el ID de lote (header `x-lote-id`) en la subida inicial.
+2. En `uploadRoutes.js` (Multer), crear automáticamente un sub-directorio asociado a ese lote temporalmente (`uploads/temp/{userId}/{loteId}`).
+3. Al procesar final, la IA mueve los documentos a otro subdirectorio fijo `uploads/final/{userId}/{loteId}`.
+4. Al eliminar la cotización, `quoteController.js` ahora aplica `fs.rmSync(dir, { recursive: true })` tanto al directorio temporal como al final de ese lote específico, y borra todo el contenedor en una sola instruccion, lo que es inmensamente más seguro y limpio.

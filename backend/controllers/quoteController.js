@@ -56,27 +56,27 @@ exports.deleteQuote = async (req, res) => {
             });
         }
 
-        // 1b. Eliminar TODOS los archivos del lote en el directorio final
+        // 1b. Eliminar TODO el directorio del lote en la carpeta final y temporal si existen
         if (quote.loteId) {
-            const finalUploadDir = path.join(rootDir, 'uploads', 'final', String(userId));
+            // Carpeta final
+            const finalUploadDir = path.join(rootDir, 'uploads', 'final', String(userId), String(quote.loteId));
             if (fs.existsSync(finalUploadDir)) {
                 try {
-                    const files = fs.readdirSync(finalUploadDir);
-                    files.forEach(file => {
-                        if (file.startsWith(quote.loteId + '-')) {
-                            const filePath = path.join(finalUploadDir, file);
-                            if (fs.existsSync(filePath)) {
-                                try {
-                                    fs.unlinkSync(filePath);
-                                    console.log(`Archivo asociado al lote eliminado: ${filePath}`);
-                                } catch (e) {
-                                    console.error(`Error eliminando archivo de lote ${filePath}:`, e);
-                                }
-                            }
-                        }
-                    });
+                    fs.rmSync(finalUploadDir, { recursive: true, force: true });
+                    console.log(`Directorio final asociado al lote eliminado: ${finalUploadDir}`);
                 } catch (dirErr) {
-                    console.error("Error leyendo directorio final para limpieza de lote:", dirErr);
+                    console.error("Error eliminando directorio final del lote:", dirErr);
+                }
+            }
+
+            // Carpeta temporal (por si acaso quedaron basuras)
+            const tempUploadDir = path.join(rootDir, 'uploads', 'temp', String(userId), String(quote.loteId));
+            if (fs.existsSync(tempUploadDir)) {
+                try {
+                    fs.rmSync(tempUploadDir, { recursive: true, force: true });
+                    console.log(`Directorio temporal asociado al lote eliminado: ${tempUploadDir}`);
+                } catch (dirErr) {
+                    console.error("Error eliminando directorio temporal del lote:", dirErr);
                 }
             }
         }

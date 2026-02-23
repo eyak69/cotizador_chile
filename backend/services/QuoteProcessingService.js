@@ -213,9 +213,10 @@ class QuoteProcessingService {
                 observaciones: typeof c.caracteristicas?.otros_beneficios === 'object' ? JSON.stringify(c.caracteristicas.otros_beneficios) : (c.caracteristicas?.otros_beneficios || null),
                 CotizacionId: nuevaCotizacion.id,
                 empresa_id: selectedEmpresa ? selectedEmpresa.id : null,
+                // Y al final en saveQuoteToDB
                 CotizacionId: nuevaCotizacion.id,
                 empresa_id: selectedEmpresa ? selectedEmpresa.id : null,
-                rutaArchivo: `/uploads/final/${userId}/${finalFileName}`
+                rutaArchivo: finalRelativePath
             }));
 
             const detallesAInsertar = [];
@@ -273,15 +274,15 @@ class QuoteProcessingService {
 
     moveFileToFinal(tempPath, originalName, loteId, userId) {
         const rootDir = getRootDir();
-        const finalUploadDir = path.join(rootDir, 'uploads', 'final', String(userId));
+        const finalUploadDir = path.join(rootDir, 'uploads', 'final', String(userId), String(loteId));
         if (!fs.existsSync(finalUploadDir)) fs.mkdirSync(finalUploadDir, { recursive: true });
 
-        const prefix = loteId || Date.now();
-        const finalFileName = `${prefix}-${originalName}`;
-        const finalPath = path.join(finalUploadDir, finalFileName);
+        const finalPath = path.join(finalUploadDir, originalName);
 
         fs.copyFileSync(tempPath, finalPath);
-        return finalFileName;
+
+        // Retornar la ruta relativa que se guardará en la base de datos
+        return `/uploads/final/${userId}/${loteId}/${originalName}`;
     }
 }
 

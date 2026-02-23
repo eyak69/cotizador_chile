@@ -16,6 +16,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import TuneIcon from '@mui/icons-material/Tune';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import SettingsIcon from '@mui/icons-material/Settings';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -160,133 +162,135 @@ const SettingsPanel = () => {
     };
 
     return (
-        <Box sx={{ width: '100%', maxWidth: 900, mx: 'auto' }}>
+        <Box sx={{ width: '100%', maxWidth: 700, mx: 'auto', p: { xs: 2, sm: 3 }, pb: { xs: 10, sm: 3 } }}>
 
-            {/* ── SECCIÓN: CONFIGURACIÓN IA (API KEY + MODELO) ───────────────────────── */}
-            <Paper sx={{
-                p: 3, mb: 3, borderRadius: 3,
-                border: '1px solid rgba(99,102,241,0.3)',
-                background: 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(30,41,59,0.95) 100%)'
+            {/* Título de la sección (Tuerca) */}
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1.5 }}>
+                <SettingsIcon sx={{ color: '#a855f7', fontSize: 24 }} />
+                <Typography variant="h6" fontWeight={800} sx={{ color: '#fff' }}>
+                    Configuración General
+                </Typography>
+            </Box>
+
+            {/* TARJETA 1: Configuración de IA */}
+            <Box sx={{
+                mb: 3, p: 3, borderRadius: 3,
+                background: 'rgba(20, 20, 30, 0.6)',
+                border: '1px solid rgba(255,255,255,0.05)'
             }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                    <Box sx={{
-                        p: 1, borderRadius: 1.5,
-                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                        display: 'flex', alignItems: 'center'
-                    }}>
-                        <KeyIcon sx={{ color: 'white', fontSize: 20 }} />
-                    </Box>
-                    <Box>
-                        <Typography variant="h6" fontWeight={700}>Configuración de IA</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            Define tu API Key y el modelo de inteligencia artificial a utilizar
-                        </Typography>
-                    </Box>
-                    {geminiSaved && (
-                        <Chip
-                            icon={<CheckCircleIcon />}
-                            label="Configurada"
-                            size="small"
-                            color="success"
-                            sx={{ ml: 'auto' }}
-                        />
-                    )}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Typography variant="subtitle1" fontWeight={800} sx={{ color: '#fff' }}>Configuración de IA</Typography>
+                    <Chip
+                        label={geminiSaved ? "CONFIGURADA" : "PENDIENTE"}
+                        size="small"
+                        sx={{
+                            background: geminiSaved ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            color: geminiSaved ? '#10b981' : '#ef4444',
+                            fontWeight: 800, fontSize: '0.65rem', borderRadius: 1
+                        }}
+                    />
                 </Box>
-
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Obtén tu clave gratuita en{' '}
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer"
-                        style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 600 }}>
-                        Google AI Studio →
-                    </a>
+                <Typography variant="body2" sx={{ color: '#94a3b8', mb: 3 }}>
+                    Gestiona tus credenciales de modelos
                 </Typography>
 
-                <Grid container spacing={2} alignItems="flex-start">
-                    <Grid item xs={12} md={7}>
-                        <TextField
-                            id="gemini-api-key"
-                            label="Gemini API Key"
-                            type={showGemini ? 'text' : 'password'}
-                            value={geminiKey}
-                            onChange={e => setGeminiKey(e.target.value)}
-                            fullWidth
-                            placeholder="AIza..."
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <KeyIcon sx={{ color: '#6366f1', fontSize: 18 }} />
-                                    </InputAdornment>
-                                ),
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton onClick={() => setShowGemini(!showGemini)} size="small">
-                                            {showGemini ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
-                            }}
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                        />
-                    </Grid>
-                    <Grid item xs={12} md={3}>
-                        <TextField
-                            select
-                            label="Modelo IA"
-                            value={selectedModel}
-                            onChange={(e) => setSelectedModel(e.target.value)}
-                            fullWidth
-                            SelectProps={{ native: true }}
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                        >
-                            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recomendado)</option>
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                        </TextField>
-                    </Grid>
-                    <Grid item xs={12} md={2}>
-                        <Button
-                            id="save-gemini-key-btn"
-                            variant="contained"
-                            fullWidth
-                            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
-                            onClick={handleSaveConfig}
-                            disabled={saving} // Permitir guardar aunque no haya key si solo cambia modelo
-                            sx={{
-                                py: 1.7, borderRadius: 2,
-                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                                fontWeight: 700, whiteSpace: 'nowrap',
-                                boxShadow: '0 4px 12px rgba(99,102,241,0.4)',
-                                '&:hover': { boxShadow: '0 6px 16px rgba(99,102,241,0.55)' },
-                                height: '56px' // Match textfield height
-                            }}
-                        >
-                            {saving ? '...' : 'Guardar'}
-                        </Button>
-                    </Grid>
-                </Grid>
-            </Paper>
-
-            {/* ── SECCIÓN: PLANTILLA WORD ─────────────────────────────── */}
-            <Paper sx={{ p: 3, mb: 3, borderRadius: 3, border: '1px solid rgba(255,255,255,0.08)' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                    <Box sx={{
-                        p: 1, borderRadius: 1.5,
-                        background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
-                        display: 'flex', alignItems: 'center'
-                    }}>
-                        <DescriptionIcon sx={{ color: 'white', fontSize: 20 }} />
-                    </Box>
-                    <Box>
-                        <Typography variant="h6" fontWeight={700}>Plantilla de Presupuesto</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            Archivo .docx base para generar cotizaciones
-                        </Typography>
-                    </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="caption" sx={{ color: '#e2e8f0', fontWeight: 600 }}>Gemini API Key</Typography>
+                    <Typography
+                        variant="caption"
+                        component="a"
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        sx={{ color: '#a855f7', textDecoration: 'none', cursor: 'pointer' }}
+                    >
+                        Obtén tu clave aquí
+                    </Typography>
                 </Box>
+                <TextField
+                    type={showGemini ? 'text' : 'password'}
+                    value={geminiKey}
+                    onChange={e => setGeminiKey(e.target.value)}
+                    fullWidth size="small"
+                    placeholder="********************"
+                    sx={{
+                        mb: 3,
+                        '& .MuiOutlinedInput-root': {
+                            borderRadius: 2, background: 'rgba(0,0,0,0.3)', color: '#fff',
+                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                            '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+                            '&.Mui-focused fieldset': { borderColor: '#a855f7' }
+                        }
+                    }}
+                    InputProps={{
+                        endAdornment: (
+                            <InputAdornment position="end">
+                                <IconButton onClick={() => setShowGemini(!showGemini)} size="small" sx={{ color: '#64748b' }}>
+                                    {showGemini ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                                </IconButton>
+                            </InputAdornment>
+                        ),
+                    }}
+                />
 
+                <Typography variant="caption" sx={{ color: '#e2e8f0', fontWeight: 600, mb: 1, display: 'block' }}>Modelo IA</Typography>
+                <TextField
+                    select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    fullWidth size="small"
+                    SelectProps={{ native: true }}
+                    sx={{
+                        mb: 4,
+                        '& .MuiOutlinedInput-root': {
+                            borderRadius: 2, background: 'rgba(0,0,0,0.3)', color: '#fff',
+                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                            '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+                            '&.Mui-focused fieldset': { borderColor: '#a855f7' }
+                        },
+                        '& select': { paddingRight: '32px' },
+                        '& .MuiNativeSelect-icon': { color: '#94a3b8' }
+                    }}
+                >
+                    <option style={{ background: '#1e293b' }} value="gemini-2.0-flash">Gemini 2.0 Flash (Recomendado)</option>
+                    <option style={{ background: '#1e293b' }} value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                    <option style={{ background: '#1e293b' }} value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                </TextField>
 
+                <Button
+                    variant="contained"
+                    fullWidth
+                    onClick={handleSaveConfig}
+                    disabled={saving}
+                    sx={{
+                        py: 1.5, borderRadius: 2,
+                        background: '#a855f7',
+                        color: '#fff', fontWeight: 800,
+                        '&:hover': { background: '#9333ea' },
+                        '&.Mui-disabled': { background: 'rgba(168,85,247,0.5)', color: 'rgba(255,255,255,0.5)' }
+                    }}
+                >
+                    {saving ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'}
+                </Button>
+            </Box>
 
-                <Box sx={{ display: 'flex', gap: 2 }}>
+            {/* TARJETA 2: Plantilla de Presupuesto */}
+            <Box sx={{
+                mb: 3, p: 3, borderRadius: 3,
+                background: 'rgba(20, 20, 30, 0.6)',
+                border: '1px solid rgba(255,255,255,0.05)'
+            }}>
+                <Typography variant="subtitle1" fontWeight={800} sx={{ color: '#fff', mb: 0.5 }}>Plantilla de Presupuesto</Typography>
+                <Typography variant="body2" sx={{ color: '#94a3b8', mb: 3 }}>
+                    Personaliza el formato de salida .docx
+                </Typography>
+
+                <Box sx={{
+                    border: '2px dashed rgba(168,85,247,0.4)',
+                    borderRadius: 3, p: 3,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(168,85,247,0.02)', cursor: 'pointer', mb: 2,
+                    '&:hover': { background: 'rgba(168,85,247,0.05)', borderColor: '#a855f7' }
+                }}>
                     <input
                         accept=".docx"
                         style={{ display: 'none' }}
@@ -294,110 +298,105 @@ const SettingsPanel = () => {
                         type="file"
                         onChange={handleUploadTemplate}
                     />
-                    <label htmlFor="template-upload-input">
-                        <Button
-                            variant="outlined"
-                            component="span"
-                            startIcon={<DescriptionIcon />}
-                            sx={{
-                                borderRadius: 2, borderColor: 'rgba(14,165,233,0.5)', color: '#0ea5e9',
-                                '&:hover': { borderColor: '#0ea5e9', background: 'rgba(14,165,233,0.08)' }
-                            }}
-                        >
-                            Subir Plantilla .DOCX
-                        </Button>
+                    <label htmlFor="template-upload-input" style={{ width: '100%', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <DescriptionIcon sx={{ color: '#a855f7', mb: 1 }} />
+                        <Typography variant="button" sx={{ color: '#fff', fontWeight: 700 }}>
+                            SUBIR PLANTILLA .DOCX
+                        </Typography>
                     </label>
+                </Box>
+
+                <Box sx={{ textAlign: 'center' }}>
                     <Button
                         variant="text"
+                        startIcon={<FileDownloadIcon sx={{ fontSize: '1rem' }} />}
                         onClick={async () => {
                             try {
-                                const response = await api.get('/config/template/sample', {
-                                    responseType: 'blob'
-                                });
-                                // Crear url del blob y forzar descarga
+                                const response = await api.get('/config/template/sample', { responseType: 'blob' });
                                 const url = window.URL.createObjectURL(new Blob([response.data]));
                                 const link = document.createElement('a');
                                 link.href = url;
-                                link.setAttribute('download', 'Plantilla_Ejemplo_Cotizador.docx');
+                                link.setAttribute('download', 'Plantilla_Ejemplo.docx');
                                 document.body.appendChild(link);
                                 link.click();
                                 link.parentNode.removeChild(link);
                                 showToast('Descarga iniciada');
                             } catch (error) {
-                                console.error("Error descarga plantilla:", error);
                                 showToast('Error al descargar plantilla', 'error');
                             }
                         }}
-                        sx={{ color: 'text.secondary', borderRadius: 2 }}
+                        sx={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600, '&:hover': { color: '#e2e8f0' } }}
                     >
-                        Descargar Ejemplo
+                        DESCARGAR EJEMPLO DE ESTRUCTURA
                     </Button>
                 </Box>
-            </Paper>
+            </Box>
 
-            {/* ── SECCIÓN: PARÁMETROS AVANZADOS ───────────────────────── */}
+            {/* TARJETA 3: Parámetros Avanzados */}
             {user?.role === 'admin' && (
                 <Accordion
                     defaultExpanded={false}
                     sx={{
-                        borderRadius: '12px !important', border: '1px solid rgba(255,255,255,0.08)',
-                        background: 'rgba(30,41,59,0.7)', '&:before': { display: 'none' }
+                        mb: 3, p: 1, borderRadius: '12px !important',
+                        background: 'rgba(20, 20, 30, 0.6)',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        '&:before': { display: 'none' },
+                        color: '#fff'
                     }}
                 >
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <TuneIcon sx={{ color: '#6366f1', fontSize: 20 }} />
+                    <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: '#94a3b8' }} />}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ p: 1, borderRadius: 2, background: 'rgba(255,255,255,0.05)' }}>
+                                <TuneIcon sx={{ color: '#6366f1', fontSize: 20 }} />
+                            </Box>
                             <Box>
-                                <Typography variant="subtitle1" fontWeight={700}>Parámetros Avanzados</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                    {parameters.length} parámetro{parameters.length !== 1 ? 's' : ''} configurado{parameters.length !== 1 ? 's' : ''}
+                                <Typography variant="subtitle2" fontWeight={800} sx={{ color: '#fff' }}>Parámetros Avanzados</Typography>
+                                <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600 }}>
+                                    {parameters.length} PARÁMETRO{parameters.length !== 1 ? 'S' : ''} CONFIGURADO{parameters.length !== 1 ? 'S' : ''}
                                 </Typography>
                             </Box>
                         </Box>
                     </AccordionSummary>
 
                     <AccordionDetails sx={{ pt: 0 }}>
-                        <Divider sx={{ mb: 2 }} />
+                        <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
                         <Button
                             id="new-param-btn"
                             variant="outlined"
                             size="small"
                             startIcon={<AddIcon />}
                             onClick={() => handleOpenDialog()}
-                            sx={{ mb: 2, borderRadius: 2 }}
+                            sx={{ mb: 2, borderRadius: 2, color: '#e2e8f0', borderColor: 'rgba(255,255,255,0.2)' }}
                         >
                             Nuevo Parámetro
                         </Button>
 
                         {parameters.length === 0 ? (
-                            <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                            <Typography variant="body2" sx={{ color: '#94a3b8', py: 2, textAlign: 'center' }}>
                                 No tienes parámetros adicionales configurados.
                             </Typography>
                         ) : (
-                            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                            <TableContainer sx={{ background: 'transparent' }}>
                                 <Table size="small">
                                     <TableHead>
-                                        <TableRow>
-                                            <TableCell sx={{ fontWeight: 700 }}>Clave</TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }}>Valor</TableCell>
-                                            <TableCell align="right" sx={{ fontWeight: 700 }}>Acciones</TableCell>
+                                        <TableRow sx={{ '& th': { borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8' } }}>
+                                            <TableCell>Clave</TableCell>
+                                            <TableCell>Valor</TableCell>
+                                            <TableCell align="right">Acciones</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
                                         {parameters.map((row) => (
-                                            <TableRow key={row.parametro} hover>
-                                                <TableCell sx={{ fontWeight: 600, color: '#6366f1', fontFamily: 'monospace' }}>
+                                            <TableRow key={row.parametro} sx={{ '& td': { borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#e2e8f0' } }}>
+                                                <TableCell sx={{ fontWeight: 600, color: '#a855f7' }}>
                                                     {row.parametro}
                                                 </TableCell>
-                                                <TableCell sx={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                                                    {row.valor && row.valor.length > 60 ? row.valor.substring(0, 60) + '…' : row.valor}
+                                                <TableCell sx={{ maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {row.valor}
                                                 </TableCell>
                                                 <TableCell align="right">
-                                                    <IconButton size="small" onClick={() => handleOpenDialog(row)}>
+                                                    <IconButton size="small" onClick={() => handleOpenDialog(row)} sx={{ color: '#94a3b8' }}>
                                                         <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                    <IconButton size="small" color="error" onClick={() => handleDeleteParam(row.parametro)}>
-                                                        <DeleteIcon fontSize="small" />
                                                     </IconButton>
                                                 </TableCell>
                                             </TableRow>
@@ -411,8 +410,18 @@ const SettingsPanel = () => {
             )}
 
             {/* ── DIALOG ABM ──────────────────────────────────────────── */}
-            <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{ fontWeight: 700 }}>
+            <Dialog
+                open={openDialog}
+                onClose={() => setOpenDialog(false)}
+                maxWidth="sm" fullWidth
+                PaperProps={{
+                    sx: {
+                        background: '#1e293b', color: '#fff', borderRadius: 3,
+                        border: '1px solid rgba(255,255,255,0.1)'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>
                     {isNew ? 'Nuevo Parámetro' : 'Editar Parámetro'}
                 </DialogTitle>
                 <DialogContent>
@@ -421,20 +430,32 @@ const SettingsPanel = () => {
                         value={editingParam.parametro}
                         onChange={e => setEditingParam({ ...editingParam, parametro: e.target.value })}
                         disabled={!isNew}
-                        sx={{ mb: 2, mt: 1 }}
-                        InputProps={{ style: { fontFamily: 'monospace' } }}
+                        sx={{
+                            mb: 2, mt: 1,
+                            '& .MuiInputLabel-root': { color: '#94a3b8' },
+                            '& .MuiOutlinedInput-root': {
+                                color: '#fff', borderRadius: 2, background: 'rgba(0,0,0,0.2)',
+                                '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' }
+                            }
+                        }}
                     />
                     <TextField
                         fullWidth label="Valor"
                         value={editingParam.valor}
                         onChange={e => setEditingParam({ ...editingParam, valor: e.target.value })}
                         multiline rows={4}
-                        InputProps={{ style: { fontFamily: 'monospace', fontSize: '0.85rem' } }}
+                        sx={{
+                            '& .MuiInputLabel-root': { color: '#94a3b8' },
+                            '& .MuiOutlinedInput-root': {
+                                color: '#fff', borderRadius: 2, background: 'rgba(0,0,0,0.2)',
+                                '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' }
+                            }
+                        }}
                     />
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={() => setOpenDialog(false)}>Cancelar</Button>
-                    <Button onClick={handleSaveParam} variant="contained" sx={{ borderRadius: 2 }}>
+                    <Button onClick={() => setOpenDialog(false)} sx={{ color: '#94a3b8' }}>Cancelar</Button>
+                    <Button onClick={handleSaveParam} variant="contained" sx={{ background: '#a855f7', color: '#fff', borderRadius: 2 }}>
                         Guardar
                     </Button>
                 </DialogActions>
@@ -447,7 +468,7 @@ const SettingsPanel = () => {
                 onClose={() => setToast({ ...toast, open: false })}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
-                <Alert severity={toast.severity} sx={{ borderRadius: 2 }}>{toast.msg}</Alert>
+                <Alert severity={toast.severity} sx={{ borderRadius: 2, background: '#1e293b', color: '#fff' }}>{toast.msg}</Alert>
             </Snackbar>
         </Box>
     );

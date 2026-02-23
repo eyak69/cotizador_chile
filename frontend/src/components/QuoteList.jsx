@@ -31,31 +31,29 @@ const QuoteList = ({ data }) => {
             </Box>
 
             {/* Resumen Cliente/Auto */}
-            <Card sx={{ mb: 3, bgcolor: 'background.paper', backgroundImage: 'linear-gradient(to right, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1))' }}>
-                <CardContent>
-                    <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="overline" color="text.secondary">Asegurado</Typography>
-                            <Typography variant="h6">{data.asegurado || 'No identificado'}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="overline" color="text.secondary">Vehículo</Typography>
-                            <Typography variant="h6">{data.vehiculo || 'No identificado'}</Typography>
-                        </Grid>
+            <Box className="glass-card" sx={{ mb: 4, p: 3, background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(59, 130, 246, 0.1) 100%)', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+                <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                        <Typography variant="overline" sx={{ color: '#a78bfa', fontWeight: 600, letterSpacing: 1 }}>Asegurado</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 700 }}>{data.asegurado || 'No identificado'}</Typography>
                     </Grid>
-                </CardContent>
-            </Card>
+                    <Grid item xs={12} sm={6}>
+                        <Typography variant="overline" sx={{ color: '#a78bfa', fontWeight: 600, letterSpacing: 1 }}>Vehículo</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 700 }}>{data.vehiculo || 'No identificado'}</Typography>
+                    </Grid>
+                </Grid>
+            </Box>
 
             {/* Grid de Cotizaciones */}
             <Grid container spacing={3}>
                 {data.cotizaciones && data.cotizaciones.map((quote, index) => (
                     <Grid item xs={12} md={6} lg={4} key={index}>
-                        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)', borderColor: 'primary.main', border: '1px solid' } }}>
-                            <CardContent>
-                                <Typography variant="h6" gutterBottom color="text.primary">
+                        <Card className="glass-card" sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: 'all 0.3s ease', '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 12px 24px rgba(139, 92, 246, 0.2)', border: '1px solid rgba(139, 92, 246, 0.5)' } }}>
+                            <CardContent sx={{ p: 3 }}>
+                                <Typography variant="h6" gutterBottom sx={{ fontWeight: 800, color: '#fff' }}>
                                     {quote.compania || 'Compañía Desconocida'}
                                 </Typography>
-                                <Typography variant="body2" color="secondary" sx={{ fontWeight: 600, mb: 2 }}>
+                                <Typography variant="body1" sx={{ fontWeight: 600, mb: 3, color: '#a78bfa' }}>
                                     {quote.plan || 'Plan Base'}
                                 </Typography>
 

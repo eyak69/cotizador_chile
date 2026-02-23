@@ -11,16 +11,14 @@ const rootDir = path.resolve(__dirname, '..', '..');
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // Asegurar que existe req.user (el authMiddleware debe ir ANTES de multer)
-        // Pero multer a veces corre antes si no se organiza bien. 
-        // En esta estructura router.post('/', authMiddleware, uploadMiddleware...) 
-        // el authMiddleware corre antes, PERO multer se configura aquí al inicio. 
-        // TRUCO: Multer middleware se ejecuta cuando se llama 'upload.single'.
-        // Para tener acceso a req.user en 'destination', necesitamos que authMiddleware haya corrido.
-        // En la definición de la ruta está correcto: authMiddleware -> uploadMiddleware.
-
         const userId = req.user ? req.user.id : 'anonymous';
-        const userDir = path.join(rootDir, 'uploads', 'temp', String(userId));
+        let userDir = path.join(rootDir, 'uploads', 'temp', String(userId));
+
+        // Extraer loteId de los headers ya que req.body no está disponible áun en destination
+        const loteId = req.headers['x-lote-id'];
+        if (loteId) {
+            userDir = path.join(userDir, loteId);
+        }
 
         if (!fs.existsSync(userDir)) {
             fs.mkdirSync(userDir, { recursive: true });
@@ -28,8 +26,6 @@ const storage = multer.diskStorage({
         cb(null, userDir);
     },
     filename: (req, file, cb) => {
-        // Mantener nombre original pero quizás prevenir colisiones simples si fuera necesario
-        // Por ahora mantenemos originalName como pide la lógica de negocio
         cb(null, file.originalname);
     }
 });
@@ -72,15 +68,26 @@ const uploadMiddleware = (req, res, next) => {
         // Si no hay archivo (aunque multer no siempre falla por esto si no es required en su logica, lo verificamos en controller)
         if (!req.file) {
             console.warn(`⚠️ [UPLOAD WARNING] Petición procesada por Multer pero req.file está vacio.`);
-        } else {
-            console.log(`✅ [UPLOAD SUCCESS] Archivo recibido exitosamente en backend:`);
-            console.log(`   📄 Nombre: ${req.file.originalname}`);
-            console.log(`   💾 Type: ${req.file.mimetype}`);
-            console.log(`   📏 Size: ${req.file.size} bytes`);
-            console.log(`   📂 Path Temp: ${req.file.path}`);
+            return next();
         }
 
-        next();
+        console.log(`✅ [UPLOAD MULTER SUCCESS] Archivo recibido en backend.`);
+
+        // Validación Estricta con Magic Bytes
+        import('file-type').then(({ fileTypeFromFile }) => {
+            return fileTypeFromFile(req.file.path).then(type => {
+                if (!type || type.mime !== 'application/pdf') {
+                    console.error(`🚨 [SECURITY ALERT] Archivo rechazado por Magic Bytes. Esperado PDF, obtenido: ${type?.mime || 'desconocido'}.`);
+                    fs.promises.unlink(req.file.path).catch(() => { });
+                    return res.status(400).json({ error: 'Formato de archivo engañoso. Solo se permiten PDFs reales.' });
+                }
+                console.log(`🛡️ [VERIFIED] Archivo confirmado como PDF legítimo: ${req.file.originalname}`);
+                next();
+            });
+        }).catch(err => {
+            console.error(`⚠️ [MAGIC BYTES WARNING] No se pudo validar magic bytes: ${err.message}`);
+            next();
+        });
     });
 };
 

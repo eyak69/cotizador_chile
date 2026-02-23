@@ -66,17 +66,42 @@ const FileUpload = ({ onQuoteProcessed }) => {
         });
     };
 
+    const validatePdfMagicBytes = (file) => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const arr = new Uint8Array(e.target.result);
+                // PDF magic bytes: %PDF- (hex: 25 50 44 46 2D)
+                if (arr.length >= 5 && arr[0] === 0x25 && arr[1] === 0x50 && arr[2] === 0x44 && arr[3] === 0x46 && arr[4] === 0x2D) {
+                    resolve(true);
+                } else {
+                    resolve(false);
+                }
+            };
+            reader.onerror = () => resolve(false);
+            reader.readAsArrayBuffer(file.slice(0, 5));
+        });
+    };
+
     const onDrop = useCallback(async (acceptedFiles) => {
         setError(null);
 
-        // 1. Calcular MD5 de TODOS los archivos nuevos primero
+        // 1. Calcular MD5 y Validar Binario de TODOS los archivos nuevos primero
         const calculatedFiles = [];
         for (const file of acceptedFiles) {
             try {
+                // Validar primero si es realmente un PDF por dentro
+                const isRealPdf = await validatePdfMagicBytes(file);
+                if (!isRealPdf) {
+                    setToastMsg(`🚨 Archivo Engañoso: "${file.name}" fue rechazado porque está disfrazado, no es un PDF real.`);
+                    setToastOpen(true);
+                    continue; // Saltar el archivo malicioso
+                }
+
                 const md5 = await calculateMD5(file);
                 calculatedFiles.push({ file, md5 });
             } catch (err) {
-                console.error("Error calculando hash", err);
+                console.error("Error calculando hash o validando bytes", err);
             }
         }
 
@@ -150,7 +175,10 @@ const FileUpload = ({ onQuoteProcessed }) => {
                 if (file.companyId) formData.append('companyId', file.companyId);
 
                 const response = await api.post('/upload', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                        'x-lote-id': loteId
+                    }
                 });
 
                 const data = response.data;
@@ -190,46 +218,69 @@ const FileUpload = ({ onQuoteProcessed }) => {
         }
     };
 
+    const onDropRejected = useCallback((fileRejections) => {
+        const rejectedFiles = fileRejections.map(r => r.file.name).join(', ');
+        setToastMsg(`🚨 Tipo de archivo no permitido: ${rejectedFiles}. Solo se aceptan verdaderos archivos .pdf`);
+        setToastOpen(true);
+    }, []);
+
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
+        onDropRejected,
         accept: { 'application/pdf': ['.pdf'] },
         multiple: true
     });
 
     return (
         <Box>
-            <Paper
+            <Box
                 {...getRootProps()}
                 sx={{
-                    p: 5,
+                    p: { xs: 4, md: 8 },
+                    borderRadius: 4,
                     border: '2px dashed',
-                    borderColor: isDragActive ? 'primary.main' : 'grey.700',
-                    backgroundColor: isDragActive ? 'rgba(99, 102, 241, 0.1)' : 'background.paper',
+                    borderColor: isDragActive ? '#a855f7' : 'rgba(255,255,255,0.1)',
+                    background: isDragActive ? 'rgba(168,85,247,0.05)' : 'rgba(15,23,42,0.4)',
+                    backdropFilter: 'blur(10px)',
                     cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    mb: 3,
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    mb: 4,
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     '&:hover': {
-                        borderColor: 'primary.main',
-                        bgcolor: 'rgba(99, 102, 241, 0.05)'
+                        borderColor: 'rgba(168,85,247,0.5)',
+                        background: 'rgba(168,85,247,0.02)',
+                        boxShadow: '0 0 30px rgba(168,85,247,0.1)'
                     }
                 }}
             >
                 <input {...getInputProps()} />
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                    <CloudUploadIcon sx={{ fontSize: 60, color: 'primary.main' }} />
-                    <Typography variant="h6">
-                        {isDragActive ? 'Suelta los archivos aquí...' : 'Arrastra y suelta tus PDFs aquí'}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        Validación automática de duplicados por MD5
-                    </Typography>
+                <Box
+                    sx={{
+                        width: 80, height: 80, borderRadius: '50%',
+                        background: 'linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(59,130,246,0.2) 100%)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3,
+                        boxShadow: '0 0 20px rgba(168,85,247,0.4)',
+                        border: '1px solid rgba(168,85,247,0.3)',
+                    }}
+                >
+                    <CloudUploadIcon sx={{ fontSize: 40, color: '#c084fc', filter: 'drop-shadow(0 0 8px rgba(192, 132, 252, 0.8))' }} />
                 </Box>
-            </Paper>
+                <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 800, mb: 1, letterSpacing: -0.5 }}>
+                    {isDragActive ? 'SUELTA LOS ARCHIVOS AHORA' : 'Toca o Arrastra tus PDFs aquí'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#94a3b8', fontWeight: 500 }}>
+                    Validación automática de duplicados por MD5
+                </Typography>
+            </Box>
 
             {files.length > 0 && (
-                <TableContainer component={Paper} sx={{ mb: 3 }}>
-                    <Table size="small">
-                        <TableHead>
+                <TableContainer component={Box} className="glass-card" sx={{ mb: 4, overflow: 'hidden' }}>
+                    <Table size="medium">
+                        <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.02)' }}>
                             <TableRow>
                                 <TableCell>Nombre del Archivo</TableCell>
                                 <TableCell>Empresa Asignada</TableCell>
@@ -283,12 +334,30 @@ const FileUpload = ({ onQuoteProcessed }) => {
             {files.length > 0 && (
                 <Button
                     variant="contained"
-                    color="primary"
                     fullWidth
+                    className="glow-border"
                     size="large"
                     startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <AnalyticsIcon />}
                     onClick={processFiles}
                     disabled={loading || files.some(f => !f.companyId)}
+                    sx={{
+                        py: 1.8,
+                        borderRadius: 3,
+                        fontWeight: 800,
+                        fontSize: '1.1rem',
+                        background: 'linear-gradient(135deg, #8b5cf6, #3b82f6)',
+                        boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)',
+                        textTransform: 'uppercase',
+                        letterSpacing: 1,
+                        '&:hover': {
+                            background: 'linear-gradient(135deg, #7c3aed, #2563eb)',
+                            boxShadow: '0 6px 20px rgba(139, 92, 246, 0.6)'
+                        },
+                        '&.Mui-disabled': {
+                            background: 'rgba(255,255,255,0.1)',
+                            color: 'rgba(255,255,255,0.3)'
+                        }
+                    }}
                 >
                     {loading ? 'Procesando con IA...' :
                         files.some(f => !f.companyId) ? 'Selecciona Empresa para Continuar' :

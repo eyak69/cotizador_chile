@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
-    Toolbar, Typography, Box, Divider, Avatar, Tooltip, IconButton, Chip
+    Toolbar, Typography, Box, Divider, Avatar, Tooltip, IconButton
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 
 const drawerWidth = 240;
 
-const Sidebar = ({ currentTab, onTabChange }) => {
+const Sidebar = ({ currentTab, onTabChange, mobileOpen, handleDrawerToggle }) => {
     const [version, setVersion] = useState('');
     const { user, logout } = useAuth();
 
@@ -36,25 +36,17 @@ const Sidebar = ({ currentTab, onTabChange }) => {
         ? [...baseItems, { text: 'Usuarios', icon: <PeopleIcon />, index: 4, adminOnly: true }]
         : baseItems;
 
-    const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : '?';
-
-    return (
-        <Drawer
-            variant="permanent"
-            sx={{
-                width: drawerWidth,
-                flexShrink: 0,
-                [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box', borderRight: '1px solid rgba(255, 255, 255, 0.12)' },
-            }}
-        >
+    const drawerContent = (
+        <>
             <Toolbar>
                 <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Typography variant="h6" component="div" sx={{
-                        background: 'linear-gradient(135deg, #6366f1 0%, #ec4899 100%)',
+                        background: 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
-                        fontWeight: 'bold',
-                        letterSpacing: 0.5
+                        fontWeight: '800',
+                        letterSpacing: 1,
+                        fontSize: '1.4rem'
                     }}>
                         COTIZADOR IA
                     </Typography>
@@ -67,22 +59,32 @@ const Sidebar = ({ currentTab, onTabChange }) => {
                         <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
                             <ListItemButton
                                 selected={currentTab === item.index}
-                                onClick={(event) => onTabChange(event, item.index)}
+                                onClick={(event) => {
+                                    onTabChange(event, item.index);
+                                    if (handleDrawerToggle) handleDrawerToggle(); // Close drawer on mobile after selection
+                                }}
                                 sx={{
+                                    mx: 2,
+                                    mb: 1,
+                                    borderRadius: '12px',
+                                    transition: 'all 0.3s ease',
                                     '&.Mui-selected': {
                                         backgroundColor: item.adminOnly
-                                            ? 'rgba(236,72,153,0.12)'
-                                            : 'rgba(99, 102, 241, 0.15)',
-                                        borderRight: `3px solid ${item.adminOnly ? '#ec4899' : '#6366f1'}`,
-                                        '&:hover': { backgroundColor: item.adminOnly ? 'rgba(236,72,153,0.2)' : 'rgba(99,102,241,0.25)' }
+                                            ? 'rgba(236,72,153,0.15)'
+                                            : 'rgba(139, 92, 246, 0.2)',
+                                        boxShadow: item.adminOnly
+                                            ? 'inset 0 0 0 1px rgba(236,72,153,0.3), 0 0 15px rgba(236,72,153,0.1)'
+                                            : 'inset 0 0 0 1px rgba(139, 92, 246, 0.3), 0 0 15px rgba(139, 92, 246, 0.1)',
+                                        '&:hover': { backgroundColor: item.adminOnly ? 'rgba(236,72,153,0.25)' : 'rgba(139, 92, 246, 0.3)' }
                                     },
-                                    borderRadius: '0 4px 4px 0',
-                                    mr: 2
+                                    '&:hover': {
+                                        backgroundColor: 'rgba(255,255,255,0.05)'
+                                    }
                                 }}
                             >
                                 <ListItemIcon sx={{
                                     color: currentTab === item.index
-                                        ? (item.adminOnly ? '#ec4899' : '#6366f1')
+                                        ? (item.adminOnly ? '#ec4899' : '#8b5cf6')
                                         : 'text.secondary',
                                     minWidth: 40
                                 }}>
@@ -91,9 +93,10 @@ const Sidebar = ({ currentTab, onTabChange }) => {
                                 <ListItemText
                                     primary={item.text}
                                     primaryTypographyProps={{
-                                        fontWeight: currentTab === item.index ? '600' : '400',
+                                        fontWeight: currentTab === item.index ? '700' : '500',
                                         color: currentTab === item.index ? '#fff' : 'text.secondary',
-                                        fontSize: '0.95rem'
+                                        fontSize: '0.95rem',
+                                        letterSpacing: '0.3px'
                                     }}
                                 />
                             </ListItemButton>
@@ -115,10 +118,11 @@ const Sidebar = ({ currentTab, onTabChange }) => {
                     border: '1px solid rgba(99,102,241,0.15)',
                 }}>
                     <Avatar sx={{
-                        width: 34, height: 34, fontSize: '0.85rem', fontWeight: 700,
+                        width: 38, height: 38, fontSize: '0.9rem', fontWeight: 800,
                         background: user?.role === 'admin'
                             ? 'linear-gradient(135deg, #ec4899, #be185d)'
-                            : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                            : 'linear-gradient(135deg, #8b5cf6, #3b82f6)',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
                     }}>
                         {(user?.displayName || user?.email || '?').substring(0, 2).toUpperCase()}
                     </Avatar>
@@ -146,7 +150,40 @@ const Sidebar = ({ currentTab, onTabChange }) => {
                     v{version || '...'}
                 </Typography>
             </Box>
-        </Drawer>
+        </>
+    );
+
+    return (
+        <Box
+            component="nav"
+            sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+            aria-label="opciones de navegacion"
+        >
+            <Drawer
+                variant="temporary"
+                open={mobileOpen}
+                onClose={handleDrawerToggle}
+                ModalProps={{
+                    keepMounted: true, // Better open performance on mobile.
+                }}
+                sx={{
+                    display: { xs: 'block', sm: 'none' },
+                    '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+                }}
+            >
+                {drawerContent}
+            </Drawer>
+            <Drawer
+                variant="permanent"
+                sx={{
+                    display: { xs: 'none', sm: 'block' },
+                    '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, borderRight: '1px solid rgba(255, 255, 255, 0.12)' },
+                }}
+                open
+            >
+                {drawerContent}
+            </Drawer>
+        </Box>
     );
 };
 

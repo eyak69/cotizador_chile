@@ -1,5 +1,6 @@
 const { User } = require('../../models/mysql_models');
 const bcrypt = require('bcryptjs');
+const UserSetupService = require('../services/UserSetupService');
 
 // GET /api/users — lista todos los usuarios (solo admin)
 exports.getUsers = async (req, res) => {
@@ -46,6 +47,9 @@ exports.createUser = async (req, res) => {
             role: role === 'admin' ? 'admin' : 'user',
             authProvider: 'local'
         });
+
+        // Configurar el entorno del nuevo usuario copiando del admin
+        await UserSetupService.setupNewUser(user.id);
 
         res.status(201).json({
             id: user.id,

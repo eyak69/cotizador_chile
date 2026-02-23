@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Box, Paper, Typography, TextField, Button, Table, TableBody,
-    TableCell, TableContainer, TableHead, TableRow, IconButton,
+    Box, Typography, TextField, Button, IconButton,
     Dialog, DialogTitle, DialogContent, DialogActions,
     Snackbar, Alert, Chip, Avatar, CircularProgress,
-    InputAdornment, Tooltip
+    InputAdornment, Tooltip, Grid
 } from '@mui/material';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/DeleteOutlined';
+import EditIcon from '@mui/icons-material/EditOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import PersonIcon from '@mui/icons-material/Person';
+import GoogleIcon from '@mui/icons-material/Google';
+import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
+import LockIcon from '@mui/icons-material/LockOutlined';
+import SearchIcon from '@mui/icons-material/Search';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import api from '../services/api';
@@ -99,155 +101,170 @@ const UserManager = () => {
 
     const getInitials = (name, email) => (name || email || '?').substring(0, 2).toUpperCase();
 
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredUsers = users.filter(u =>
+        (u.displayName && u.displayName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
     return (
-        <Box sx={{ width: '100%', maxWidth: 900, mx: 'auto' }}>
-            <Paper sx={{
-                p: 3, borderRadius: 3,
-                border: '1px solid rgba(236,72,153,0.2)',
-                background: 'linear-gradient(135deg, rgba(236,72,153,0.04) 0%, rgba(30,41,59,0.95) 100%)'
-            }}>
-                {/* Header */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Box sx={{
-                            p: 1, borderRadius: 1.5,
-                            background: 'linear-gradient(135deg, #ec4899, #be185d)',
-                            display: 'flex'
-                        }}>
-                            <AdminPanelSettingsIcon sx={{ color: 'white', fontSize: 20 }} />
-                        </Box>
-                        <Box>
-                            <Typography variant="h6" fontWeight={700}>Usuarios con Acceso</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                Solo visible para administradores
-                            </Typography>
-                        </Box>
-                    </Box>
-                    <Button
-                        id="create-user-btn"
-                        variant="contained"
-                        startIcon={<PersonAddIcon />}
-                        onClick={() => setOpenDialog(true)}
-                        sx={{
-                            background: 'linear-gradient(135deg, #ec4899, #be185d)',
-                            borderRadius: 2, fontWeight: 700,
-                            boxShadow: '0 4px 12px rgba(236,72,153,0.35)',
-                            '&:hover': { boxShadow: '0 6px 16px rgba(236,72,153,0.5)' }
-                        }}
-                    >
-                        Invitar Usuario
-                    </Button>
+        <Box sx={{ width: '100%', maxWidth: 1000, mx: 'auto', p: { xs: 2, sm: 3 } }}>
+            {/* Header */}
+            <Box sx={{ mb: 3 }}>
+                <Typography variant="h5" fontWeight={800} sx={{ color: '#fff', mb: 0.5 }}>Usuarios con Acceso</Typography>
+                <Typography variant="body2" sx={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <LockIcon sx={{ fontSize: 14 }} /> Solo visible para administradores
+                </Typography>
+            </Box>
+
+            {/* Invite Button */}
+            <Button
+                id="create-user-btn"
+                fullWidth
+                variant="contained"
+                startIcon={<PersonAddIcon />}
+                onClick={() => setOpenDialog(true)}
+                sx={{
+                    mb: 3, py: 1.5,
+                    background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)', // Pink gradient from mockup
+                    borderRadius: 8, fontWeight: 700, fontSize: '0.95rem',
+                    boxShadow: '0 8px 20px rgba(244, 63, 94, 0.3)',
+                    textTransform: 'uppercase', letterSpacing: 0.5,
+                    '&:hover': {
+                        background: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
+                        boxShadow: '0 8px 25px rgba(244, 63, 94, 0.5)'
+                    }
+                }}
+            >
+                INVITAR USUARIO
+            </Button>
+
+            {/* Search Bar */}
+            <TextField
+                placeholder="Buscar por nombre o email..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                fullWidth
+                sx={{
+                    mb: 4,
+                    '& .MuiOutlinedInput-root': {
+                        borderRadius: 8,
+                        background: 'rgba(255,255,255,0.03)',
+                        color: '#cbd5e1',
+                        '& fieldset': { borderColor: 'rgba(255,255,255,0.05)' },
+                        '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                        '&.Mui-focused fieldset': { borderColor: '#f43f5e' }
+                    },
+                    '& .MuiInputBase-input::placeholder': { color: '#64748b', opacity: 1 }
+                }}
+                InputProps={{
+                    startAdornment: <InputAdornment position="start"><SearchIcon sx={{ color: '#64748b', fontSize: 20 }} /></InputAdornment>
+                }}
+            />
+
+            {/* User List Cards */}
+            {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                    <CircularProgress size={32} sx={{ color: '#f43f5e' }} />
                 </Box>
+            ) : (
+                <Grid container spacing={2}>
+                    {filteredUsers.map((u) => (
+                        <Grid item xs={12} sm={6} key={u.id}>
+                            <Box sx={{
+                                height: '100%', display: 'flex', flexDirection: 'column',
+                                p: 2.5, borderRadius: 4,
+                                background: 'rgba(20, 20, 30, 0.6)',
+                                border: '1px solid rgba(255,255,255,0.05)',
+                                position: 'relative'
+                            }}>
+                                {/* Card Header (Avatar + Info + Edit) */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                    <Avatar sx={{
+                                        width: 48, height: 48, fontSize: '1.2rem', fontWeight: 700, mr: 2,
+                                        background: u.role === 'admin' ? 'transparent' : '#2e1065',
+                                        border: u.role === 'admin' ? '2px solid #ec4899' : 'none',
+                                        color: u.role === 'admin' ? '#fff' : '#c4b5fd'
+                                    }}>
+                                        {getInitials(u.displayName, u.email)}
+                                    </Avatar>
 
-                {loading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                        <CircularProgress size={32} />
-                    </Box>
-                ) : (
-                    <TableContainer sx={{ borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <Table>
-                            <TableHead>
-                                <TableRow sx={{ '& th': { fontWeight: 700, color: 'text.secondary', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: 0.5 } }}>
-                                    <TableCell>Nombre</TableCell>
-                                    <TableCell>Email</TableCell>
-                                    <TableCell>Método</TableCell>
-                                    <TableCell>Rol</TableCell>
-                                    <TableCell align="right">Acciones</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {users.map((u) => (
-                                    <TableRow key={u.id} hover>
-                                        {/* Nombre editable */}
-                                        <TableCell>
+                                    <Box sx={{ flexGrow: 1 }}>
+                                        {editingId === u.id ? (
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <Avatar sx={{
-                                                    width: 32, height: 32, fontSize: '0.8rem', fontWeight: 700, flexShrink: 0,
-                                                    background: u.role === 'admin'
-                                                        ? 'linear-gradient(135deg, #ec4899, #be185d)'
-                                                        : 'linear-gradient(135deg, #6366f1, #8b5cf6)'
-                                                }}>
-                                                    {getInitials(u.displayName, u.email)}
-                                                </Avatar>
-
-                                                {editingId === u.id ? (
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                        <TextField
-                                                            value={editingName}
-                                                            onChange={e => setEditingName(e.target.value)}
-                                                            onKeyDown={e => { if (e.key === 'Enter') saveName(u.id); if (e.key === 'Escape') cancelEdit(); }}
-                                                            size="small"
-                                                            autoFocus
-                                                            placeholder="Nombre..."
-                                                            sx={{ width: 140 }}
-                                                        />
-                                                        <Tooltip title="Guardar">
-                                                            <IconButton size="small" color="success" onClick={() => saveName(u.id)}>
-                                                                <SaveIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                        <Tooltip title="Cancelar">
-                                                            <IconButton size="small" onClick={cancelEdit}>
-                                                                <CloseIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                    </Box>
-                                                ) : (
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                        <Typography variant="body2" fontWeight={600}>
-                                                            {u.displayName || <em style={{ color: '#6b7280' }}>Sin nombre</em>}
-                                                        </Typography>
-                                                        <Tooltip title="Editar nombre">
-                                                            <IconButton size="small" onClick={() => startEditName(u)} sx={{ opacity: 0.4, '&:hover': { opacity: 1 } }}>
-                                                                <EditIcon sx={{ fontSize: 14 }} />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                    </Box>
-                                                )}
-                                            </Box>
-                                        </TableCell>
-
-                                        <TableCell>
-                                            <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>
-                                                {u.email}
-                                            </Typography>
-                                        </TableCell>
-
-                                        <TableCell>
-                                            <Chip
-                                                label={u.authProvider === 'google' ? '🔵 Google' : u.password ? '📧 Email' : '⏳ Sin contraseña'}
-                                                size="small"
-                                                sx={{ fontWeight: 600, fontSize: '0.75rem' }}
-                                            />
-                                        </TableCell>
-
-                                        <TableCell>
-                                            <Tooltip title={`Cambiar a ${u.role === 'admin' ? 'usuario' : 'admin'}`}>
-                                                <Chip
-                                                    icon={u.role === 'admin' ? <AdminPanelSettingsIcon sx={{ fontSize: 14 }} /> : <PersonIcon sx={{ fontSize: 14 }} />}
-                                                    label={u.role === 'admin' ? 'Admin' : 'Usuario'}
-                                                    size="small"
-                                                    color={u.role === 'admin' ? 'secondary' : 'default'}
-                                                    onClick={() => handleToggleRole(u)}
-                                                    sx={{ cursor: 'pointer', fontWeight: 600, fontSize: '0.75rem' }}
+                                                <TextField
+                                                    value={editingName}
+                                                    onChange={e => setEditingName(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter') saveName(u.id); if (e.key === 'Escape') cancelEdit(); }}
+                                                    size="small" autoFocus placeholder="Nombre..."
+                                                    sx={{ '& .MuiInputBase-input': { color: '#fff', py: 0.5 } }}
                                                 />
-                                            </Tooltip>
-                                        </TableCell>
+                                                <IconButton size="small" color="success" onClick={() => saveName(u.id)}><SaveIcon fontSize="small" /></IconButton>
+                                                <IconButton size="small" onClick={cancelEdit}><CloseIcon fontSize="small" sx={{ color: '#94a3b8' }} /></IconButton>
+                                            </Box>
+                                        ) : (
+                                            <>
+                                                <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#fff', lineHeight: 1.2 }}>
+                                                    {u.displayName || 'Sin nombre'}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.8rem' }}>
+                                                    {u.email}
+                                                </Typography>
+                                            </>
+                                        )}
+                                    </Box>
 
-                                        <TableCell align="right">
-                                            <Tooltip title="Eliminar usuario">
-                                                <IconButton size="small" color="error" onClick={() => handleDeleteUser(u.id, u.email)}>
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                )}
-            </Paper>
+                                    {/* Edit Button */}
+                                    {!editingId && (
+                                        <IconButton size="small" onClick={() => startEditName(u)} sx={{ backgroundColor: 'rgba(255,255,255,0.05)', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}>
+                                            <EditIcon sx={{ fontSize: 18, color: '#94a3b8' }} />
+                                        </IconButton>
+                                    )}
+                                </Box>
+
+                                {/* Card Actions (Badges + Delete) */}
+                                <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        {/* Role Badge */}
+                                        <Chip
+                                            icon={u.role === 'admin' ? <AdminPanelSettingsIcon sx={{ fontSize: 14 }} /> : null}
+                                            label={u.role === 'admin' ? 'ADMIN' : 'USUARIO'}
+                                            size="small"
+                                            onClick={() => handleToggleRole(u)}
+                                            sx={{
+                                                fontWeight: 800, fontSize: '0.65rem', letterSpacing: 0.5,
+                                                background: u.role === 'admin' ? 'rgba(236, 72, 153, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                color: u.role === 'admin' ? '#ec4899' : '#cbd5e1',
+                                                border: 'none', borderRadius: 4,
+                                                '& .MuiChip-icon': { color: u.role === 'admin' ? '#ec4899' : '#cbd5e1' }
+                                            }}
+                                        />
+                                        {/* Provider Badge */}
+                                        <Chip
+                                            icon={u.authProvider === 'google' ? <GoogleIcon sx={{ fontSize: 14 }} /> : <EmailOutlinedIcon sx={{ fontSize: 14 }} />}
+                                            label={u.authProvider === 'google' ? 'Google' : 'Email'}
+                                            size="small"
+                                            sx={{
+                                                fontWeight: 700, fontSize: '0.7rem',
+                                                background: 'rgba(56, 189, 248, 0.1)',
+                                                color: '#38bdf8',
+                                                border: 'none', borderRadius: 4,
+                                                '& .MuiChip-icon': { color: '#38bdf8' }
+                                            }}
+                                        />
+                                    </Box>
+
+                                    {/* Delete Button */}
+                                    <IconButton size="small" onClick={() => handleDeleteUser(u.id, u.email)} sx={{ color: '#64748b', '&:hover': { color: '#ef4444' } }}>
+                                        <DeleteIcon sx={{ fontSize: 20 }} />
+                                    </IconButton>
+                                </Box>
+                            </Box>
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
 
             {/* Dialog Crear/Invitar Usuario */}
             <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>

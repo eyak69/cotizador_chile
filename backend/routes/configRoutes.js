@@ -40,12 +40,31 @@ const uploadTemplateMiddleware = (req, res, next) => {
             return res.status(400).json({ error: err.message });
         }
 
-        if (req.file) {
-            console.log(`[TEMPLATE UPLOAD SUCCESS] Archivo recibido: ${req.file.originalname} (${req.file.size} bytes)`);
-        } else {
+        if (!req.file) {
             console.warn('[TEMPLATE UPLOAD WARNING] Req.file está vacío después de Multer.');
+            return next();
         }
-        next();
+
+        console.log(`[TEMPLATE UPLOAD SUCCESS] Archivo recibido: ${req.file.originalname}`);
+
+        // Validación estructurada de Magic Bytes
+        import('file-type').then(({ fileTypeFromFile }) => {
+            return fileTypeFromFile(req.file.path).then(type => {
+                // Word files usually have complex zipped types or simple doc types.
+                // Los .docx modernos son application/zip
+                const validMimes = ['application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/x-cfb'];
+                if (!type || !validMimes.includes(type.mime)) {
+                    console.error(`🚨 [SECURITY ALERT] Plantilla maliciosa detectada. Mime recibido: ${type?.mime || 'desconocido'}.`);
+                    fs.promises.unlink(req.file.path).catch(() => { });
+                    return res.status(400).json({ error: 'Formato de plantilla inválido o engañoso. Solo se permiten archivos de Word.' });
+                }
+                console.log(`🛡️ [VERIFIED] Plantilla confirmada segura.`);
+                next();
+            });
+        }).catch(err => {
+            console.error(`⚠️ [MAGIC BYTES WARNING] No se pudo validar la plantilla: ${err.message}`);
+            next();
+        });
     });
 };
 

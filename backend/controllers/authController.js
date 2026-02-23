@@ -2,8 +2,13 @@ const { User } = require('../../models/mysql_models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
+const UserSetupService = require('../services/UserSetupService');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret_key_desarrollo';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error("⚠️ CRÍTICO: No se ha configurado JWT_SECRET. La seguridad de los tokens está comprometida.");
+}
+const secretToUse = JWT_SECRET || 'secret_key_desarrollo';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -13,7 +18,7 @@ const isRegistrationOpen = () => process.env.REGISTRATION_OPEN === 'true';
 const generateToken = (user) => {
     return jwt.sign(
         { id: user.id, email: user.email, role: user.role, displayName: user.displayName },
-        JWT_SECRET,
+        secretToUse,
         { expiresIn: '7d' }
     );
 };
@@ -54,6 +59,9 @@ exports.register = async (req, res) => {
             authProvider: 'local'
         });
 
+        // Configurar el entorno del nuevo usuario copiando del admin
+        await UserSetupService.setupNewUser(newUser.id);
+
         const token = generateToken(newUser);
         res.status(201).json({
             token,
@@ -84,7 +92,7 @@ exports.login = async (req, res) => {
         if (!user.password && !user.googleId) {
             const setupToken = jwt.sign(
                 { id: user.id, purpose: 'setup_password' },
-                JWT_SECRET,
+                secretToUse,
                 { expiresIn: '1h' }
             );
             return res.status(200).json({
@@ -129,7 +137,7 @@ exports.setupPassword = async (req, res) => {
 
         let decoded;
         try {
-            decoded = jwt.verify(setupToken, JWT_SECRET);
+            decoded = jwt.verify(setupToken, secretToUse);
         } catch {
             return res.status(401).json({ message: 'Token inválido o expirado. Intenta iniciar sesión de nuevo.' });
         }
@@ -200,6 +208,9 @@ exports.googleAuth = async (req, res) => {
                     authProvider: 'google',
                     password: null
                 });
+
+                // Configurar el entorno del nuevo usuario copiando del admin
+                await UserSetupService.setupNewUser(user.id);
             }
         }
 

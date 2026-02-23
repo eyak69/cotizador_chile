@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ThemeProvider, createTheme, CssBaseline, Container, Box, Typography } from '@mui/material';
+import { ThemeProvider, createTheme, CssBaseline, Container, Box, Typography, AppBar, Toolbar, IconButton } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
 import FileUpload from './components/FileUpload';
 import QuoteList from './components/QuoteList';
 import QuoteMasterDetail from './components/QuoteMasterDetail';
@@ -15,10 +16,10 @@ const darkTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#6366f1',
+      main: '#8b5cf6', // Violet/purple typical for dark premium
     },
     secondary: {
-      main: '#ec4899',
+      main: '#ec4899', // Pinkish
     },
     background: {
       default: '#0f172a',
@@ -26,17 +27,57 @@ const darkTheme = createTheme({
     },
   },
   typography: {
-    fontFamily: '"Outfit", "Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"Space Grotesk", "Inter", "Outfit", "Roboto", sans-serif',
     h3: {
       fontWeight: 700,
     },
+    h4: {
+      fontWeight: 700,
+      letterSpacing: '-0.5px'
+    }
   },
+  shape: {
+    borderRadius: 12,
+  },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          background: 'radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.15), transparent 25%), radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.15), transparent 25%), #0f172a',
+          backgroundAttachment: 'fixed',
+          minHeight: '100vh',
+          margin: 0,
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontWeight: 600,
+          borderRadius: '8px',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+        }
+      }
+    }
+  }
 });
 
 function AppContent() {
   const { user, loading } = useAuth();
   const [quoteData, setQuoteData] = useState(null);
   const [currentTab, setCurrentTab] = useState(0);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
 
   const handleQuoteProcessed = (data) => {
     console.log("Datos recibidos:", data);
@@ -60,18 +101,51 @@ function AppContent() {
   }
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <CssBaseline />
+    <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
 
-      <Sidebar currentTab={currentTab} onTabChange={handleTabChange} />
+      <AppBar
+        position="fixed"
+        sx={{
+          width: { sm: `calc(100% - 240px)` },
+          ml: { sm: `240px` },
+          display: { sm: 'none' }, // Solo mostrar en móviles
+          background: '#0f172a',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.12)'
+        }}
+        elevation={0}
+      >
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 2, display: { sm: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6" noWrap component="div" sx={{
+            background: 'linear-gradient(135deg, #6366f1 0%, #ec4899 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            fontWeight: 'bold',
+          }}>
+            COTIZADOR IA
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      <Sidebar currentTab={currentTab} onTabChange={handleTabChange} mobileOpen={mobileOpen} handleDrawerToggle={handleDrawerToggle} />
 
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
-          pt: 2,
-          width: { sm: `calc(100% - 240px)` },
+          p: { xs: 2, sm: 3 },
+          pt: { xs: 10, sm: 3 }, // Espacio superior para el AppBar en modo móvil
+          width: { xs: '100%', sm: `calc(100% - 240px)` },
+          height: '100vh',
+          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center'
@@ -82,9 +156,10 @@ function AppContent() {
           component="h1"
           sx={{
             fontWeight: 'bold',
-            mb: 4,
+            mb: { xs: 2, sm: 4 },
             width: '100%',
-            textAlign: 'center'
+            textAlign: 'center',
+            fontSize: { xs: '1.8rem', sm: '2.125rem' }
           }}
         >
           {currentTab === 0 && 'Panel de Cotización'}
@@ -125,6 +200,7 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider theme={darkTheme}>
+      <CssBaseline />
       <AppContent />
     </ThemeProvider>
   );

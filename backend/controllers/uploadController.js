@@ -30,13 +30,13 @@ exports.processUpload = async (req, res) => {
             console.log("🧹 DEBUG=false: Limpiando archivos temporales...");
 
             // Borrar PDF optimizado si se creó
-            if (wasOptimized && fs.existsSync(optimizedPath)) {
-                try { fs.unlinkSync(optimizedPath); } catch (e) { console.error("Error borrando opt:", e); }
+            if (wasOptimized && optimizedPath) {
+                fs.promises.unlink(optimizedPath).catch(e => console.error("Error borrando opt:", e.message));
             }
 
             // Borrar PDF original subido (ya se movió copia a /final)
-            if (req.file && fs.existsSync(req.file.path)) {
-                try { fs.unlinkSync(req.file.path); } catch (e) { console.error("Error borrando temp:", e); }
+            if (req.file && req.file.path) {
+                fs.promises.unlink(req.file.path).catch(e => console.error("Error borrando temp:", e.message));
             }
         } else {
             console.log("🐞 DEBUG=true: Archivos temporales conservados en /uploads/temp/");
@@ -68,6 +68,7 @@ exports.processUpload = async (req, res) => {
 
     } catch (error) {
         console.error('Error en uploadController:', error);
-        res.status(500).json({ error: 'Ocurrió un error al procesar la cotización.', details: error.message });
+        // Enviar un mensaje de error genérico al backend, protegiendo las rutas internas / datos.
+        res.status(500).json({ error: 'Ocurrió un error interno al procesar la cotización. Contacta con soporte técnico.' });
     }
 };
