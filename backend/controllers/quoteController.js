@@ -34,6 +34,8 @@ exports.deleteQuote = async (req, res) => {
 
         // 1. Eliminar archivos físicos asociados
         const rootDir = getRootDir();
+
+        // 1a. Eliminar rutaArchivos de Detalles
         if (quote.detalles && quote.detalles.length > 0) {
             quote.detalles.forEach(detalle => {
                 if (detalle.rutaArchivo) {
@@ -45,13 +47,38 @@ exports.deleteQuote = async (req, res) => {
                     if (fs.existsSync(filePath)) {
                         try {
                             fs.unlinkSync(filePath);
-                            console.log(`Archivo eliminado: ${filePath}`);
+                            console.log(`Archivo eliminado (detalle): ${filePath}`);
                         } catch (err) {
                             console.error(`Error eliminando archivo ${filePath}:`, err);
                         }
                     }
                 }
             });
+        }
+
+        // 1b. Eliminar TODOS los archivos del lote en el directorio final
+        if (quote.loteId) {
+            const finalUploadDir = path.join(rootDir, 'uploads', 'final', String(userId));
+            if (fs.existsSync(finalUploadDir)) {
+                try {
+                    const files = fs.readdirSync(finalUploadDir);
+                    files.forEach(file => {
+                        if (file.startsWith(quote.loteId + '-')) {
+                            const filePath = path.join(finalUploadDir, file);
+                            if (fs.existsSync(filePath)) {
+                                try {
+                                    fs.unlinkSync(filePath);
+                                    console.log(`Archivo asociado al lote eliminado: ${filePath}`);
+                                } catch (e) {
+                                    console.error(`Error eliminando archivo de lote ${filePath}:`, e);
+                                }
+                            }
+                        }
+                    });
+                } catch (dirErr) {
+                    console.error("Error leyendo directorio final para limpieza de lote:", dirErr);
+                }
+            }
         }
 
         await DetalleCotizacion.destroy({ where: { CotizacionId: id } });

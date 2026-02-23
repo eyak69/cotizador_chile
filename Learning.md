@@ -126,3 +126,22 @@ Se agregó una funcionalidad para que, al crearse un nuevo usuario en la platafo
 ### Lecciones
 - Al clonar registros con Sequelize usando `bulkCreate()`, asegúrese de proyectar solo los campos deseados omitiendo los `id` originales, y asignando el nuevo `userId`.
 - No capturar errores del servicio de clonación hacia arriba previene que el fallo de la copia aborte la creación de la cuenta de usuario.
+
+## 2026-02-21 - Revisión de Seguridad y Ajustes UI Responsivos
+
+### Revisión de Seguridad
+1. **Auditoría de Paquetes (`npm audit`)**: Se identificaron 11 vulnerabilidades (10 Altas, 1 Baja) en el backend, principalmente derivadas de dependencias subyacentes (`minimatch` en `exceljs` y `gaxios`). Suponen riesgo de ReDoS (Denegación de servicio por expresiones regulares). Se decidió posponer un `npm audit fix --force` porque actualiza `exceljs` a una versión con *breaking changes*.
+2. **Protección de Credenciales**: El archivo `.gitignore` está configurado correctamente impidiendo la subida de `.env` y de la carpeta `uploads/`.
+3. **Escudos Express**: Actualmente el servidor (`app.js`) no cuenta con middlewares de seguridad como `helmet` o `express-rate-limit`. Esto se delega a las reglas del proxy en Coolify o se marcará como deuda técnica para futuras implementaciones.
+
+### Ajustes de UI (Grillas vs Listas)
+- Se homologó el uso de `Grid` (cuadrícula responsiva de 2 columnas en Desktop) para la "Gestión de Empresas" y la sección de "Usuarios con Acceso" (`UserManager.jsx`), expandiendo sus contenedores de `600px` a `1000px` para una mejor visualización.
+- Se aprendió la importancia de consultar/confirmar con el usuario antes de aplicar patrones visuales en bloque: el requerimiento exigía mantener el "Historial de Operaciones" como una lista vertical de una sola columna y paginación a 5 ítems, por motivos de experiencia de usuario específica y requerimientos funcionales.
+
+## 2026-02-23 - Eliminación Completa de Archivos de Lote en Historial
+
+### Qué se implementó
+Se mejoró la lógica de eliminación de cotizaciones en `quoteController.js`. Anteriormente solo se eliminaban los archivos cuyas rutas exactas estaban guardadas en `DetalleCotizacion`. Ahora, además de eso, el sistema busca activamente en el directorio de subidas finales (`uploads/final/{userId}`) todos los archivos que comiencen con el prefijo del `loteId` de la cotización y los elimina de forma forzada.
+
+### Por qué
+Esto asegura que la eliminación de una entrada desde la interfaz de historial limpie **absolutamente todos** los archivos asociados a dicho lote (archivos subidos originalmente, documentos procesados, y cualquier archivo que hubiera quedado huérfano si la extracción de datos fallara parcial o totalmente), garantizando que no queden "archivos basura" ocupando disco en el servidor.
