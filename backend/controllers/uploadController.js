@@ -37,9 +37,14 @@ exports.processUpload = async (req, res) => {
         }
 
         if (isUfCero && String(pagesToKeep) !== "0") {
-            console.log("🚨 ALERTA: La IA devolvió Prima UF = 0. Posible error de páginas cortadas (se esperaban valores en la página configurada). Iniciando REINTENTO con documento completo (páginas=0)...");
+            console.log("🚨 ALERTA: La IA devolvió Prima UF = 0. Posible error de páginas cortadas. Iniciando REINTENTO con documento completo (páginas=0)...");
+
+            // Pequeño delay antes del reintento para evitar rate-limit (429) de Gemini en lotes múltiples
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
             // Re-optimizar con configuración "0" (Todo el documento)
+            // IMPORTANTE: req.file.path debe existir todavía. La limpieza de temporales
+            // se hace MÁS ABAJO, DESPUÉS de este bloque. (Bug Fix: antes estaba antes)
             const retryOpt = await QuoteProcessingService.optimizePdf(req.file.path, "0", req.user.id, loteId);
             const retryPathForAI = retryOpt.optimizedPath || req.file.path;
 
@@ -53,9 +58,8 @@ exports.processUpload = async (req, res) => {
         // Mover archivo final para historial (Siempre)
         const finalRelativePath = await QuoteProcessingService.moveFileToFinal(req.file.path, req.file.originalname, loteId, req.user.id);
 
-        // Guardar la nueva cotización (se movió dentro de la DB la ruta final de MoveFileToFinal)
-
-        // Limpieza de Temporales Incondicional (Solicitado por usuario)
+        // Limpieza de Temporales — se hace DESPUÉS del reintento para que req.file.path
+        // siga existiendo si fue necesario re-procesar el PDF completo (Bug Fix).
         console.log("🧹 Limpiando toda la carpeta temporal de este lote incondicionalmente...");
         const tempDir = path.join(__dirname, '..', '..', 'uploads', 'temp', String(req.user.id), String(loteId));
         if (fs.existsSync(tempDir)) {
