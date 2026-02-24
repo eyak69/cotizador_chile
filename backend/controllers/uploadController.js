@@ -9,10 +9,31 @@ exports.processUpload = async (req, res) => {
 
         console.log(`Procesando archivo subido: ${req.file.originalname}`);
 
+        const loteId = req.headers['x-lote-id'] || req.body.loteId;
+        const fileMd5 = req.headers['x-file-md5'] || null;
+
+        // --- CACHÉ POR MD5: Si el mismo PDF ya fue procesado recientemente, devolver resultado sin llamar a Gemini ---
+        if (fileMd5) {
+            const hace72h = new Date(Date.now() - 72 * 60 * 60 * 1000);
+            const cached = await Cotizacion.findOne({
+                where: { file_md5: fileMd5, userId: req.user.id },
+                include: [{ model: DetalleCotizacion, as: 'detalles' }],
+                order: [['createdAt', 'DESC']]
+            });
+
+            if (cached && cached.detalles && cached.detalles.length > 0 && new Date(cached.createdAt) > hace72h) {
+                console.log(`⚡ CACHÉ HIT: MD5 ${fileMd5} encontrado en DB (ID: ${cached.id}). Devolviendo sin llamar a Gemini.`);
+                // Limpiar el archivo subido (no lo necesitamos)
+                try { fs.unlinkSync(req.file.path); } catch (e) { /* ignorar */ }
+                return res.json({ ...cached.toJSON(), _cache_hit: true });
+            }
+        }
+        // --- FIN CACHÉ ---
+
         // 1. Identificar Empresa
         const { selectedEmpresa, pagesToKeep } = await QuoteProcessingService.identifyCompany(req.file.originalname, req.body.companyId, req.user.id);
 
-        const loteId = req.headers['x-lote-id'] || req.body.loteId;
+
 
         // 2. Optimizar PDF si es necesario
         const { optimizedPath, wasOptimized } = await QuoteProcessingService.optimizePdf(req.file.path, pagesToKeep, req.user.id, loteId);
@@ -89,7 +110,7 @@ exports.processUpload = async (req, res) => {
         }
 
         // 6. Guardar en DB (Forzar sugerencia de mitigación si hubo reintento isUfCero)
-        const nuevaCotizacion = await QuoteProcessingService.saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalRelativePath, req.user.id, isUfCero);
+        const nuevaCotizacion = await QuoteProcessingService.saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalRelativePath, req.user.id, isUfCero, fileMd5);
         console.log('Cotización guardada en MySQL ID:', nuevaCotizacion.id);
 
         const optimizationSuggestion = nuevaCotizacion.getDataValue('optimization_suggestion');

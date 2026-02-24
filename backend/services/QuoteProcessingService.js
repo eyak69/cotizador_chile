@@ -177,6 +177,7 @@ class QuoteProcessingService {
             apiKey: aiConfig.apiKey,
             modelName: aiConfig.useModel,
             specificPromptRules: selectedEmpresa ? selectedEmpresa.prompt_reglas : null,
+            companyId: selectedEmpresa ? selectedEmpresa.id : null,  // Para filtrar reglas de corrección
             debugMode: aiConfig.debugMode
         };
 
@@ -184,7 +185,7 @@ class QuoteProcessingService {
         return await interpreterFunction(filePath, originalName, interpreterConfig);
     }
 
-    async saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalFileName, userId, forceOptimizationSuggestion = false) {
+    async saveQuoteToDB(quoteData, loteId, selectedEmpresa, finalFileName, userId, forceOptimizationSuggestion = false, fileMd5 = null) {
         let nuevaCotizacion;
 
         if (loteId) {
@@ -195,11 +196,16 @@ class QuoteProcessingService {
             if (!nuevaCotizacion.asegurado && quoteData.asegurado) {
                 await nuevaCotizacion.update({ asegurado: quoteData.asegurado, vehiculo: quoteData.vehiculo });
             }
+            // Actualizar MD5 si aun no está guardado en este lote
+            if (fileMd5 && !nuevaCotizacion.file_md5) {
+                await nuevaCotizacion.update({ file_md5: fileMd5 });
+            }
         } else {
             nuevaCotizacion = await Cotizacion.create({
                 asegurado: quoteData.asegurado,
                 vehiculo: quoteData.vehiculo,
                 loteId: loteId,
+                file_md5: fileMd5 || null,
                 userId: userId || null
             });
         }

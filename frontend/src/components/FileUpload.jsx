@@ -241,7 +241,8 @@ const FileUpload = ({ onQuoteProcessed }) => {
             const response = await api.post('/upload', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
-                    'x-lote-id': loteId
+                    'x-lote-id': loteId,
+                    'x-file-md5': md5   // Para caché en backend — evita llamada a Gemini si ya fue procesado
                 }
             });
 

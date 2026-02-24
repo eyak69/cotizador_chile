@@ -53,27 +53,25 @@ async function interpretQuoteData(filePath, originalFileName = "", config = {}) 
     let learningContext = "";
     try {
       const { CorrectionRule, Empresa } = require('../../models/mysql_models');
-      const allRules = await CorrectionRule.findAll({ include: [Empresa] });
+      // Optimización tokens: si hay empresa específica, filtrar solo sus reglas
+      const whereClause = config.companyId ? { EmpresaId: config.companyId } : {};
+      const allRules = await CorrectionRule.findAll({ where: whereClause, include: [Empresa] });
 
       if (allRules.length > 0) {
         const rulesText = allRules.map(r =>
-          `- Para ${r.Empresa ? r.Empresa.nombre : 'Cualquier Empresa'}: Si ves "${r.valor_incorrecto}" en el campo "${r.campo}", CORRÍGELO a "${r.valor_correcto}".`
+          `- Para ${r.Empresa ? r.Empresa.nombre : 'Cualquier Empresa'}: Si ves "${r.valor_incorrecto}" en el campo "${r.campo}", CÓRRIGELO a "${r.valor_correcto}".`
         ).join("\n");
 
-        learningContext = `\n\nATENCIÓN - APRENDIZAJE DE ERRORES PREVIOS (Override):
-El usuario ha corregido manualmente errores anteriores. APLICA ESTAS CORRECCIONES SIEMPRE:
-${rulesText}
----------------------------------------------------`;
-        console.log(`🧠 Se inyectaron ${allRules.length} reglas de aprendizaje al prompt.`);
+        learningContext = `\n\nATENCION - CORRECCIONES MANUALES APRENDIDAS (Override):\n${rulesText}\n---`;
+        console.log(`🧠 ${allRules.length} reglas de aprendizaje inyectadas (empresa: ${config.companyId || 'todas'}).`);
       }
     } catch (errRules) {
       console.warn("⚠️ Error cargando reglas de aprendizaje:", errRules.message);
     }
     // ------------------------------------------------------------------    
 
-    const prompt = `Contexto: Actúa como un analista de seguros experto en la estructura de documentos de aseguradoras en Chile (SURA, MAPFRE, HDI, etc.). Tu tarea es procesar el texto extraído (OCR) de una cotización de vehículo motorizado y normalizar los datos.
+    const prompt = `Contexto: Actúa como un analista de seguros experto en documentos de aseguradoras en Chile. Tu tarea es extraer y normalizar datos de cotizaciones de vehículo.
 
-INSTRUCCIONES ESPECÍFICAS POR EMPRESA (Prioridad Máxima):
 INSTRUCCIONES ESPECÍFICAS POR EMPRESA (Prioridad Máxima):
 ${reglasEmpresas}
 ${learningContext}
