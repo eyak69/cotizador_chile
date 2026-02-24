@@ -181,3 +181,70 @@ Al principio se intentó disparar la sugerencia al "mutar" en memoria `selectedE
 **Segundo bug encontrado:** La condición de entrada al bloque de sugerencia evaluaba `triggerSuggestion` basándose en si `paginas_procesamiento === '0'`. Esto excluía completamente el bloque cuando la empresa tenía páginas configuradas (ej: `"3"`), por lo que `hasNewPages` nunca se calculaba.
 
 **Fix definitivo en `QuoteProcessingService.js`:** Se eliminó la guarda `triggerSuggestion` del outer `if`, dejando que siempre entre al bloque si hay `selectedEmpresa`. Dentro, `hasNewPages` compara las páginas retornadas por la IA (`paginas_encontradas`) con las páginas numéricas configuradas en la empresa (`currentPagesArr`). Si alguna página encontrada no está en la config, se dispara el popup. Esto cubre ambos casos: reintento forzado (UF=0) y detección pasiva de páginas no configuradas.
+
+## 2026-02-24 - Procesamiento Paralelo de PDFs y Bugs de Concurrencia
+
+### Bugs Detectados en Carga Múltiple (UF=0)
+
+**Bug Raíz:** Al subir 3 archivos de diferentes empresas, uno devolvía UF=0. Al subir ese mismo archivo solo, la IA encontraba los datos correctamente.
+
+Causa identificada: en `uploadController.js`, todos los archivos del lote comparten el mismo `loteId` y por tanto el mismo directorio temporal (`uploads/temp/{userId}/{loteId}/`). Cuando multer guarda los archivos en ese directorio compartido y un archivo termina su procesamiento antes que otro y borra el directorio completo con `fs.rmSync(tempDir, { recursive: true })`, el archivo de otro proceso en curso desaparece → **ENOENT**.
+
+### Fix Bug #1: Orden de la limpieza temporal
+
+- **Antes (bug):** `fs.rmSync(tempDir)` se ejecutaba ANTES del bloque de reintento automático. Si isUfCero era true, el reintento intentaba leer `req.file.path` que ya no existía.
+- **Después (fix):** La limpieza se mueve DESPUÉS del bloque de reintento completo.
+- **Lección:** Siempre limpiar DESPUÉS de que el proceso que usa el archivo haya terminado.
+
+### Fix Bug #2: Limpieza selectiva por archivo (no por directorio)
+
+- **Antes (bug):** `fs.rmSync(tempDir, { recursive: true })` borraba TODO el directorio compartido, eliminando los PDFs de los otros archivos del mismo lote que aún se estaban procesando.
+- **Después (fix):** Cambiar a `fs.unlinkSync(filePath)` por cada archivo individual (`req.file.path`, `optimizedPath`, `retryOptimizedPath`).
+- **Patrón:** Con concurrencia, nunca borrar un directorio compartido desde una request individual. Borrar solo los archivos propios de esa request.
+
+```js
+// ⛔ MAL (en paralelo)
+fs.rmSync(tempDir, { recursive: true });
+
+// ✅ BIEN (en paralelo)
+const filesToClean = [req.file.path, optimizedPath, retryOptimizedPath].filter(Boolean);
+for (const filePath of [...new Set(filesToClean)]) {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+}
+```
+
+### Fix Bug #3: Fallback defensivo para moveFileToFinal
+
+- Si por cualquier razón de concurrencia `req.file.path` desaparece antes de `moveFileToFinal`, el sistema busca el primer path disponible entre `[req.file.path, retryOptimizedPath, optimizedPath]`.
+- Si ninguno existe, lanza un error preventivo claro en vez de un ENOENT críptico.
+- **Lección:** En escenarios de concurrencia, siempre defender los puntos de fallo con existencia de archivo (`fs.existsSync`) y fallbacks ordenados por prioridad.
+
+```js
+const candidatePaths = [req.file.path, retryOptimizedPath, optimizedPath].filter(Boolean);
+const pathForFinal = candidatePaths.find(p => fs.existsSync(p));
+if (!pathForFinal) throw new Error(`ENOENT preventivo: Ninguna copia del archivo disponible`);
+```
+
+### Implementación: Procesamiento Paralelo con Promise.allSettled()
+
+Se reemplazó el bucle `for...of` secuencial del frontend por `Promise.allSettled()` con delays escalonados:
+
+- `Promise.allSettled()` lanza todos los archivos en paralelo pero no cancela los demás si uno falla.
+- **Delay escalonado:** `index * 2000ms` entre archivos (0ms, 2s, 4s) para evitar rate-limiting de la API de Gemini (límite de Requests Per Minute).
+- **Ganancia de tiempo:** 3 archivos × 15s = 45s secuencial → ~17s en paralelo (el más lento + delay).
+- **UX:** Cada fila de la tabla muestra su estado en tiempo real con `<Chip>` de MUI:
+  - ⏳ `En cola` → ⚙️ `Procesando` → ✅ `Listo` / ❌ `Error`
+
+```js
+// Lanzar TODOS en paralelo con delays escalonados
+const results = await Promise.allSettled(
+    files.map((fileObj, index) => processOneFile(fileObj, index))
+);
+// Dentro de processOneFile:
+if (index > 0) await new Promise(r => setTimeout(r, index * 2000));
+```
+
+### Lección sobre optimizePdf y pagesConfig="0"
+
+Cuando `pagesConfig="0"` (leer todo el documento), `optimizePdf` detecta que `pageIndices.length === pageCount`, por lo que NO crea un nuevo archivo (wasOptimized=false) y retorna `optimizedPath = filePath` (el mismo `req.file.path`). Esto significa que `retryOptimizedPath` puede apuntar al MISMO archivo que `req.file.path`. Usar `new Set()` al limpiar evita borrar dos veces el mismo archivo.
+
