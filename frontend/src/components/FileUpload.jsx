@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Box, Typography, Button, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Alert, Snackbar, Select, MenuItem, FormControl, InputLabel, Backdrop, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Chip } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, LinearProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Alert, Snackbar, Select, MenuItem, FormControl, InputLabel, Backdrop, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Chip } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
@@ -22,6 +22,26 @@ const FileUpload = ({ onQuoteProcessed }) => {
     const [debugData, setDebugData] = useState(null);
     // Estado de progreso por archivo: { [md5]: 'pending' | 'processing' | 'done' | 'error' }
     const [fileProgress, setFileProgress] = useState({});
+
+    // --- Estados de progreso en tiempo real ---
+    const [completedCount, setCompletedCount] = useState(0);    // Cuantos terminaron
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);    // Cronometro global
+    const [fileTimings, setFileTimings] = useState({});         // md5 -> segundos que tardó
+    const [processingStart, setProcessingStart] = useState(null);
+    const [completionStats, setCompletionStats] = useState(null); // Resumen final
+    const timerRef = useRef(null);
+
+    // Cronometro: actualiza cada segundo mientras loading=true
+    useEffect(() => {
+        if (loading && processingStart) {
+            timerRef.current = setInterval(() => {
+                setElapsedSeconds(Math.floor((Date.now() - processingStart) / 1000));
+            }, 1000);
+        } else {
+            clearInterval(timerRef.current);
+        }
+        return () => clearInterval(timerRef.current);
+    }, [loading, processingStart]);
 
     // State for optimization suggestion
     const [suggestionOpen, setSuggestionOpen] = useState(false);
@@ -180,15 +200,22 @@ const FileUpload = ({ onQuoteProcessed }) => {
         setLoading(true);
         setError(null);
         setDebugData(null);
+        setCompletionStats(null);
         onQuoteProcessed(null);
 
         // Generar ID de Lote Único
         const loteId = Date.now().toString();
+        const batchStart = Date.now();
+        setProcessingStart(batchStart);
+        setCompletedCount(0);
+        setElapsedSeconds(0);
+        setFileTimings({});
 
         // Inicializar progreso de todos los archivos como 'pending'
         const initialProgress = {};
         files.forEach(f => { initialProgress[f.md5] = 'pending'; });
         setFileProgress(initialProgress);
+        const totalFiles = files.length;
 
         const combinedDebug = [];
         let finalQuoteRecord = null;
@@ -197,6 +224,7 @@ const FileUpload = ({ onQuoteProcessed }) => {
         // Función que procesa UN archivo con delay escalonado
         const processOneFile = async (fileObj, index) => {
             const { file, md5, companyId } = fileObj;
+            const fileStart = Date.now();
 
             // Delay escalonado: archivo 0 → 0ms, archivo 1 → 2000ms, archivo 2 → 4000ms...
             if (index > 0) {
@@ -217,6 +245,9 @@ const FileUpload = ({ onQuoteProcessed }) => {
                 }
             });
 
+            const timeTaken = Math.floor((Date.now() - fileStart) / 1000);
+            setFileTimings(prev => ({ ...prev, [md5]: timeTaken }));
+            setCompletedCount(prev => prev + 1);
             setFileProgress(prev => ({ ...prev, [md5]: 'done' }));
             return { file, data: response.data };
         };
@@ -265,14 +296,26 @@ const FileUpload = ({ onQuoteProcessed }) => {
             }
 
             const allFailed = results.every(r => r.status === 'rejected');
+            const successCount = results.filter(r => r.status === 'fulfilled').length;
+            const totalElapsed = Math.floor((Date.now() - batchStart) / 1000);
+
             if (allFailed) {
-                onQuoteProcessed(null); // limpiar tabla anterior
+                onQuoteProcessed(null);
                 setError('Todos los archivos fallaron. Revisa el debugger abajo 👇');
             } else {
+                const seqEstimate = Object.values(fileTimings).reduce((a, b) => a + b, 0);
+                setCompletionStats({
+                    total: totalFiles,
+                    success: successCount,
+                    failed: totalFiles - successCount,
+                    realTime: totalElapsed,
+                    seqEstimate: seqEstimate || totalElapsed * totalFiles, // fallback
+                    saving: Math.max(0, (seqEstimate || totalElapsed * totalFiles) - totalElapsed)
+                });
+
                 console.log("Resultados Finales:", finalQuoteRecord);
                 setDebugData(combinedDebug);
                 onQuoteProcessed(finalQuoteRecord ?? null);
-                // Solo mantener archivos que fallaron (para reintentar)
                 const failedIndices = new Set(results.map((r, i) => r.status === 'rejected' ? i : -1).filter(i => i >= 0));
                 setFiles(prev => prev.filter((_, i) => failedIndices.has(i)));
             }
@@ -284,8 +327,8 @@ const FileUpload = ({ onQuoteProcessed }) => {
             setError('Hubo un error al procesar. Revisa el debugger abajo 👇');
         } finally {
             setLoading(false);
-            // Resetear progreso visual para no mostrar estados viejos en la próxima carga
             setFileProgress({});
+            setProcessingStart(null);
         }
     };
 
@@ -363,10 +406,11 @@ const FileUpload = ({ onQuoteProcessed }) => {
                         <TableBody>
                             {files.map((fileObj, index) => {
                                 const status = fileProgress[fileObj.md5] || 'pending';
+                                const timeTaken = fileTimings[fileObj.md5];
                                 const statusIcon = {
                                     pending: <Chip icon={<HourglassEmptyIcon />} label="En cola" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.07)', color: '#94a3b8' }} />,
-                                    processing: <Chip icon={<CircularProgress size={12} />} label="Procesando" size="small" color="info" />,
-                                    done: <Chip icon={<CheckCircleIcon />} label="Listo" size="small" color="success" />,
+                                    processing: <Chip icon={<CircularProgress size={12} />} label="Procesando..." size="small" color="info" />,
+                                    done: <Chip icon={<CheckCircleIcon />} label={timeTaken ? `Listo (${timeTaken}s)` : 'Listo'} size="small" color="success" />,
                                     error: <Chip icon={<ErrorIcon />} label="Error" size="small" color="error" />,
                                 }[status];
 
@@ -543,6 +587,43 @@ const FileUpload = ({ onQuoteProcessed }) => {
                 </DialogActions>
             </Dialog>
 
+            {/* Banner de resumen de procesamiento */}
+            {completionStats && (
+                <Box sx={{
+                    mt: 3, p: 2.5, borderRadius: 3,
+                    background: completionStats.failed > 0
+                        ? 'linear-gradient(135deg, rgba(234,179,8,0.1), rgba(239,68,68,0.1))'
+                        : 'linear-gradient(135deg, rgba(34,197,94,0.1), rgba(59,130,246,0.1))',
+                    border: `1px solid ${completionStats.failed > 0 ? 'rgba(234,179,8,0.3)' : 'rgba(34,197,94,0.3)'}`,
+                    display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center', justifyContent: 'space-between'
+                }}>
+                    <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: completionStats.failed > 0 ? '#fbbf24' : '#4ade80' }}>
+                            {completionStats.failed > 0
+                                ? `⚠️ ${completionStats.success} de ${completionStats.total} archivos procesados`
+                                : `✅ ${completionStats.total} archivos procesados`}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#94a3b8', mt: 0.5 }}>
+                            Tiempo real: <b style={{ color: '#fff' }}>{completionStats.realTime}s</b>
+                            {completionStats.seqEstimate > completionStats.realTime && (
+                                <>  •  Modo secuencial: <b style={{ color: '#94a3b8' }}>~{completionStats.seqEstimate}s</b></>)}
+                        </Typography>
+                    </Box>
+                    {completionStats.saving > 2 && (
+                        <Box sx={{
+                            px: 2.5, py: 1, borderRadius: 99,
+                            background: 'linear-gradient(135deg, #8b5cf6, #3b82f6)',
+                            boxShadow: '0 4px 15px rgba(139,92,246,0.4)'
+                        }}>
+                            <Typography variant="body2" sx={{ fontWeight: 800, color: '#fff', fontSize: '1rem' }}>
+                                ⚡ {completionStats.saving}s ahorrados
+                            </Typography>
+                        </Box>
+                    )}
+                    <Button size="small" onClick={() => setCompletionStats(null)} sx={{ color: '#475569', minWidth: 'auto', p: 0.5 }}>✕</Button>
+                </Box>
+            )}
+
             {/* Debugger Section */}
             {showDebug && debugData && (
                 <Box sx={{ mt: 4, p: 2, bgcolor: '#1e1e1e', borderRadius: 2, border: '1px solid #333' }}>
@@ -568,13 +649,36 @@ const FileUpload = ({ onQuoteProcessed }) => {
                 open={loading}
             >
                 <CircularProgress color="inherit" />
-                <Typography variant="h6">
-                    {files.length > 1 ? `⚡ Procesando ${files.length} archivos en paralelo...` : 'Procesando documento con IA...'}
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
                     {files.length > 1
-                        ? 'Los archivos se procesan simultáneamente. El tiempo total es el del archivo más lento.'
-                        : 'Por favor espere, esto puede tomar unos segundos.'}
+                        ? `⚡ Procesando ${files.length} archivos en paralelo...`
+                        : 'Procesando documento con IA...'}
+                </Typography>
+
+                {/* Contador progresivo */}
+                {files.length > 1 && (
+                    <Box sx={{ width: 340, textAlign: 'center' }}>
+                        <Typography variant="body2" sx={{ mb: 1, color: 'rgba(255,255,255,0.7)' }}>
+                            {completedCount} de {files.length} archivos completados
+                        </Typography>
+                        <LinearProgress
+                            variant="determinate"
+                            value={(completedCount / files.length) * 100}
+                            sx={{
+                                height: 6, borderRadius: 3,
+                                bgcolor: 'rgba(255,255,255,0.15)',
+                                '& .MuiLinearProgress-bar': {
+                                    background: 'linear-gradient(90deg, #8b5cf6, #3b82f6)',
+                                    borderRadius: 3
+                                }
+                            }}
+                        />
+                    </Box>
+                )}
+
+                {/* Cronometro */}
+                <Typography variant="body2" sx={{ opacity: 0.6, fontFamily: 'monospace', fontSize: '1rem' }}>
+                    ⏱ {String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:{String(elapsedSeconds % 60).padStart(2, '0')}
                 </Typography>
             </Backdrop>
         </Box >
