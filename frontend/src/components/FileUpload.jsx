@@ -1,10 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Box, Typography, Button, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Alert, Snackbar, Select, MenuItem, FormControl, InputLabel, Backdrop, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Alert, Snackbar, Select, MenuItem, FormControl, InputLabel, Backdrop, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Chip } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import api from '../services/api';
 import SparkMD5 from 'spark-md5';
 
@@ -17,6 +20,8 @@ const FileUpload = ({ onQuoteProcessed }) => {
     const [toastOpen, setToastOpen] = useState(false);
     const [toastMsg, setToastMsg] = useState('');
     const [debugData, setDebugData] = useState(null);
+    // Estado de progreso por archivo: { [md5]: 'pending' | 'processing' | 'done' | 'error' }
+    const [fileProgress, setFileProgress] = useState({});
 
     // State for optimization suggestion
     const [suggestionOpen, setSuggestionOpen] = useState(false);
@@ -180,54 +185,91 @@ const FileUpload = ({ onQuoteProcessed }) => {
         // Generar ID de Lote Único
         const loteId = Date.now().toString();
 
+        // Inicializar progreso de todos los archivos como 'pending'
+        const initialProgress = {};
+        files.forEach(f => { initialProgress[f.md5] = 'pending'; });
+        setFileProgress(initialProgress);
+
         const combinedDebug = [];
         let finalQuoteRecord = null;
+        let firstSuggestion = null;
 
-        try {
-            for (const { file } of files) {
-                const formData = new FormData();
-                formData.append('loteId', loteId);
-                formData.append('pdfFile', file);
-                if (file.companyId) formData.append('companyId', file.companyId);
+        // Función que procesa UN archivo con delay escalonado
+        const processOneFile = async (fileObj, index) => {
+            const { file, md5, companyId } = fileObj;
 
-                const response = await api.post('/upload', formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                        'x-lote-id': loteId
-                    }
-                });
-
-                const data = response.data;
-                console.log("Respuesta Individual:", data);
-
-                // Acumulamos la respuesta RAW para el debugger
-                if (data.raw_ai_response) {
-                    combinedDebug.push({
-                        archivo: file.name,
-                        ai_json: data.raw_ai_response
-                    });
-                }
-
-                // Verificamos si hay sugerencia de optimización (solo una por batch para no molestar)
-                if (data.optimization_suggestion && !suggestionData) {
-                    setSuggestionData(data.optimization_suggestion);
-                    setSuggestionOpen(true);
-                }
-
-                // El último registro contiene todos los detalles acumulados
-                finalQuoteRecord = data;
+            // Delay escalonado: archivo 0 → 0ms, archivo 1 → 2000ms, archivo 2 → 4000ms...
+            if (index > 0) {
+                await new Promise(resolve => setTimeout(resolve, index * 2000));
             }
 
-            console.log("Resultados Finales:", finalQuoteRecord);
-            setDebugData(combinedDebug); // Ahora pasamos un ARRAY al debugger
-            onQuoteProcessed(finalQuoteRecord); // La grilla usa el registro maestro final
+            setFileProgress(prev => ({ ...prev, [md5]: 'processing' }));
 
-            setFiles([]);
+            const formData = new FormData();
+            formData.append('loteId', loteId);
+            formData.append('pdfFile', file);
+            if (companyId) formData.append('companyId', companyId);
+
+            const response = await api.post('/upload', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'x-lote-id': loteId
+                }
+            });
+
+            setFileProgress(prev => ({ ...prev, [md5]: 'done' }));
+            return { file, data: response.data };
+        };
+
+        try {
+            // Lanzar TODOS los archivos en paralelo con delays escalonados
+            const results = await Promise.allSettled(
+                files.map((fileObj, index) => processOneFile(fileObj, index))
+            );
+
+            for (const result of results) {
+                if (result.status === 'fulfilled') {
+                    const { file, data } = result.value;
+                    console.log(`✅ Respuesta [${file.name}]:`, data);
+
+                    if (data.raw_ai_response) {
+                        combinedDebug.push({ archivo: file.name, ai_json: data.raw_ai_response });
+                    }
+                    if (data.optimization_suggestion && !firstSuggestion) {
+                        firstSuggestion = data.optimization_suggestion;
+                    }
+                    finalQuoteRecord = data;
+                } else {
+                    // Marcar como error el archivo que falló
+                    console.error('❌ Error en archivo del lote:', result.reason);
+                    // Buscar qué md5 falló (por índice en results)
+                    const idx = results.indexOf(result);
+                    const failedMd5 = files[idx]?.md5;
+                    if (failedMd5) setFileProgress(prev => ({ ...prev, [failedMd5]: 'error' }));
+                }
+            }
+
+            if (firstSuggestion) {
+                setSuggestionData(firstSuggestion);
+                setSuggestionOpen(true);
+            }
+
+            const allFailed = results.every(r => r.status === 'rejected');
+            if (allFailed) {
+                setError('Todos los archivos fallaron. Revisa el debugger abajo 👇');
+            } else {
+                console.log("Resultados Finales:", finalQuoteRecord);
+                setDebugData(combinedDebug);
+                onQuoteProcessed(finalQuoteRecord);
+                // Solo limpiar archivos exitosos
+                const failedIndices = new Set(results.map((r, i) => r.status === 'rejected' ? i : -1).filter(i => i >= 0));
+                setFiles(prev => prev.filter((_, i) => failedIndices.has(i)));
+            }
 
         } catch (err) {
-            console.error('Error uploading files:', err);
+            console.error('Error inesperado:', err);
             const serverError = err.response?.data || { error: err.message };
-            setDebugData(serverError); // Mostrar error del servidor en el debugger
+            setDebugData(serverError);
             setError('Hubo un error al procesar. Revisa el debugger abajo 👇');
         } finally {
             setLoading(false);
@@ -298,50 +340,62 @@ const FileUpload = ({ onQuoteProcessed }) => {
                     <Table size="medium">
                         <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.02)' }}>
                             <TableRow>
+                                <TableCell>Estado</TableCell>
                                 <TableCell>Nombre del Archivo</TableCell>
                                 <TableCell>Empresa Asignada</TableCell>
-                                <TableCell align="right">MD5 (Hash)</TableCell>
                                 <TableCell align="right">Tamaño</TableCell>
                                 <TableCell align="right">Acciones</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {files.map((fileObj, index) => (
-                                <TableRow key={fileObj.md5}>
-                                    <TableCell component="th" scope="row">
-                                        {fileObj.file.name}
-                                    </TableCell>
-                                    <TableCell>
-                                        <FormControl fullWidth size="small">
-                                            <InputLabel>Empresa</InputLabel>
-                                            <Select
-                                                value={fileObj.companyId || ''}
-                                                label="Empresa"
-                                                onChange={(e) => handleCompanyChange(fileObj.md5, e.target.value)}
-                                            >
-                                                <MenuItem value="" disabled><em>Seleccione Empresa</em></MenuItem>
-                                                {companies.map(c => (
-                                                    <MenuItem key={c.id} value={c.id}>{c.nombre}</MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: 'text.secondary' }}>
-                                        {fileObj.md5.substring(0, 8)}...
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        {(fileObj.file.size / 1024).toFixed(1)} KB
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <IconButton aria-label="preview" onClick={() => handlePreview(fileObj.file)} size="small" color="primary" sx={{ mr: 1 }}>
-                                            <VisibilityIcon />
-                                        </IconButton>
-                                        <IconButton aria-label="delete" onClick={() => handleDeleteClick(fileObj.md5)} size="small" color="error">
-                                            <DeleteIcon />
-                                        </IconButton>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            {files.map((fileObj, index) => {
+                                const status = fileProgress[fileObj.md5] || 'pending';
+                                const statusIcon = {
+                                    pending: <Chip icon={<HourglassEmptyIcon />} label="En cola" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.07)', color: '#94a3b8' }} />,
+                                    processing: <Chip icon={<CircularProgress size={12} />} label="Procesando" size="small" color="info" />,
+                                    done: <Chip icon={<CheckCircleIcon />} label="Listo" size="small" color="success" />,
+                                    error: <Chip icon={<ErrorIcon />} label="Error" size="small" color="error" />,
+                                }[status];
+
+                                return (
+                                    <TableRow key={fileObj.md5} sx={{
+                                        opacity: status === 'done' ? 0.7 : 1,
+                                        transition: 'opacity 0.4s'
+                                    }}>
+                                        <TableCell>{statusIcon}</TableCell>
+                                        <TableCell component="th" scope="row">
+                                            {fileObj.file.name}
+                                        </TableCell>
+                                        <TableCell>
+                                            <FormControl fullWidth size="small">
+                                                <InputLabel>Empresa</InputLabel>
+                                                <Select
+                                                    value={fileObj.companyId || ''}
+                                                    label="Empresa"
+                                                    onChange={(e) => handleCompanyChange(fileObj.md5, e.target.value)}
+                                                    disabled={loading}
+                                                >
+                                                    <MenuItem value="" disabled><em>Seleccione Empresa</em></MenuItem>
+                                                    {companies.map(c => (
+                                                        <MenuItem key={c.id} value={c.id}>{c.nombre}</MenuItem>
+                                                    ))}
+                                                </Select>
+                                            </FormControl>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            {(fileObj.file.size / 1024).toFixed(1)} KB
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            <IconButton aria-label="preview" onClick={() => handlePreview(fileObj.file)} size="small" color="primary" sx={{ mr: 1 }} disabled={loading}>
+                                                <VisibilityIcon />
+                                            </IconButton>
+                                            <IconButton aria-label="delete" onClick={() => handleDeleteClick(fileObj.md5)} size="small" color="error" disabled={loading}>
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </TableContainer>
@@ -375,9 +429,13 @@ const FileUpload = ({ onQuoteProcessed }) => {
                         }
                     }}
                 >
-                    {loading ? 'Procesando con IA...' :
-                        files.some(f => !f.companyId) ? 'Selecciona Empresa para Continuar' :
-                            `Analizar ${files.length} Archivo(s)`}
+                    {loading
+                        ? `Procesando ${files.length} archivo(s) en paralelo...`
+                        : files.some(f => !f.companyId)
+                            ? 'Selecciona Empresa para Continuar'
+                            : files.length > 1
+                                ? `⚡ Analizar ${files.length} Archivos en Paralelo`
+                                : `Analizar ${files.length} Archivo`}
                 </Button>
             )}
 
@@ -497,8 +555,14 @@ const FileUpload = ({ onQuoteProcessed }) => {
                 open={loading}
             >
                 <CircularProgress color="inherit" />
-                <Typography variant="h6">Procesando documentos con IA...</Typography>
-                <Typography variant="body2" sx={{ opacity: 0.8 }}>Por favor espere, esto puede tomar unos segundos.</Typography>
+                <Typography variant="h6">
+                    {files.length > 1 ? `⚡ Procesando ${files.length} archivos en paralelo...` : 'Procesando documento con IA...'}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                    {files.length > 1
+                        ? 'Los archivos se procesan simultáneamente. El tiempo total es el del archivo más lento.'
+                        : 'Por favor espere, esto puede tomar unos segundos.'}
+                </Typography>
             </Backdrop>
         </Box >
     );
