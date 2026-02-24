@@ -14,18 +14,26 @@ exports.processUpload = async (req, res) => {
 
         // --- CACHÉ POR MD5: Si el mismo PDF ya fue procesado recientemente, devolver resultado sin llamar a Gemini ---
         if (fileMd5) {
-            const hace72h = new Date(Date.now() - 72 * 60 * 60 * 1000);
-            const cached = await Cotizacion.findOne({
-                where: { file_md5: fileMd5, userId: req.user.id },
-                include: [{ model: DetalleCotizacion, as: 'detalles' }],
-                order: [['createdAt', 'DESC']]
-            });
+            try {
+                const hace72h = new Date(Date.now() - 72 * 60 * 60 * 1000);
+                const cached = await Cotizacion.findOne({
+                    where: { file_md5: fileMd5, userId: req.user.id },
+                    include: [{ model: DetalleCotizacion, as: 'detalles' }],
+                    order: [['createdAt', 'DESC']]
+                });
 
-            if (cached && cached.detalles && cached.detalles.length > 0 && new Date(cached.createdAt) > hace72h) {
-                console.log(`⚡ CACHÉ HIT: MD5 ${fileMd5} encontrado en DB (ID: ${cached.id}). Devolviendo sin llamar a Gemini.`);
-                // Limpiar el archivo subido (no lo necesitamos)
-                try { fs.unlinkSync(req.file.path); } catch (e) { /* ignorar */ }
-                return res.json({ ...cached.toJSON(), _cache_hit: true });
+                if (cached && cached.detalles && cached.detalles.length > 0 && new Date(cached.createdAt) > hace72h) {
+                    console.log(`⚡ CACHÉ HIT: MD5 ${fileMd5} encontrado en DB (ID: ${cached.id}). Devolviendo sin llamar a Gemini.`);
+                    try { fs.unlinkSync(req.file.path); } catch (e) { /* ignorar */ }
+                    return res.json({ ...cached.toJSON(), _cache_hit: true });
+                }
+            } catch (cacheErr) {
+                // La columna file_md5 puede no existir aún (sync pendiente) — ignorar y procesar normal
+                if (cacheErr.original?.code === 'ER_BAD_FIELD_ERROR') {
+                    console.warn('⚠️ Caché MD5 no disponible aún (columna pendiente de migración). Procesando normal.');
+                } else {
+                    throw cacheErr; // Otros errores sí deben propagarse
+                }
             }
         }
         // --- FIN CACHÉ ---
