@@ -12,7 +12,10 @@ exports.processUpload = async (req, res) => {
         const loteId = req.headers['x-lote-id'] || req.body.loteId;
         const fileMd5 = req.headers['x-file-md5'] || null;
 
-        // --- CACHÉ POR MD5: Si el mismo PDF ya fue procesado recientemente, devolver resultado sin llamar a Gemini ---
+        // --- CACHÉ POR MD5: Si el mismo PDF ya fue procesado recientemente, no llamar a Gemini ---
+        let quoteData = null;
+        let isCacheHit = false;
+
         if (fileMd5) {
             try {
                 const hace72h = new Date(Date.now() - 72 * 60 * 60 * 1000);
@@ -27,75 +30,115 @@ exports.processUpload = async (req, res) => {
                 });
 
                 if (cached && cached.detalles && cached.detalles.length > 0 && new Date(cached.createdAt) > hace72h) {
-                    console.log(`⚡ CACHÉ HIT: MD5 ${fileMd5} encontrado en DB (ID: ${cached.id}). Devolviendo sin llamar a Gemini.`);
+                    console.log(`⚡ CACHÉ HIT: MD5 ${fileMd5} encontrado en DB. Reconstruyendo respuesta IA sin consumir tokens...`);
+
+                    // Reconstruir el objeto quoteData tal cual lo devolvería Gemini
+                    quoteData = {
+                        asegurado: cached.asegurado,
+                        vehiculo: cached.vehiculo,
+                        comparativa_seguros: cached.detalles.map(d => ({
+                            compania: d.compania,
+                            plan: d.plan,
+                            paginas_encontradas: d.paginas_encontradas ? d.paginas_encontradas.split(',') : [],
+                            primas: {
+                                uf_3: d.prima_uf3,
+                                uf_5: d.prima_uf5,
+                                uf_10: d.prima_uf10
+                            },
+                            caracteristicas: {
+                                rc: d.rc_monto,
+                                taller_marca: d.taller_marca,
+                                reposicion_nuevo_meses: d.reposicion_meses,
+                                otros_beneficios: d.observaciones
+                            }
+                        }))
+                    };
+                    isCacheHit = true;
+
+                    // Limpiar el archivo subido temporario original
                     try { fs.unlinkSync(req.file.path); } catch (e) { /* ignorar */ }
-                    return res.json({ ...cached.toJSON(), _cache_hit: true });
                 }
             } catch (cacheErr) {
                 // La columna file_md5 puede no existir aún (sync pendiente) — ignorar y procesar normal
                 if (cacheErr.original?.code === 'ER_BAD_FIELD_ERROR') {
                     console.warn('⚠️ Caché MD5 no disponible aún (columna pendiente de migración). Procesando normal.');
                 } else {
-                    throw cacheErr; // Otros errores sí deben propagarse
+                    throw cacheErr;
                 }
             }
         }
         // --- FIN CACHÉ ---
 
-        // 1. Identificar Empresa
+        // 1. Identificar Empresa (siempre es necesario para guardar DetalleCotizacion en upload final)
         const { selectedEmpresa, pagesToKeep } = await QuoteProcessingService.identifyCompany(req.file.originalname, req.body.companyId, req.user.id);
 
-
-
-        // 2. Optimizar PDF si es necesario
-        const { optimizedPath, wasOptimized } = await QuoteProcessingService.optimizePdf(req.file.path, pagesToKeep, req.user.id, loteId);
-        const pathForAI = optimizedPath || req.file.path;
-
-        // 3. Configuración IA
-        const aiConfig = await QuoteProcessingService.getAIConfiguration(req.user.id);
-
-        // 4. Llamada IA
-        let quoteData = await QuoteProcessingService.processWithAI(pathForAI, req.file.originalname, aiConfig, selectedEmpresa);
-
-        // --- REINTENTO AUTOMÁTICO SI HAY VALORES EN 0 ---
+        let optimizedPath = null;
+        let retryOptimizedPath = null;
         let isUfCero = false;
-        let retryOptimizedPath = null; // Guardamos para limpiar después
-        if (quoteData && quoteData.comparativa_seguros && quoteData.comparativa_seguros.length > 0) {
-            // Revisamos si alguna de las opciones arrojó $0 o UF 0 en todas sus primas
-            isUfCero = quoteData.comparativa_seguros.some(opcion => {
-                const p3 = parseFloat(opcion.primas?.uf_3) || 0;
-                const p5 = parseFloat(opcion.primas?.uf_5) || 0;
-                const p10 = parseFloat(opcion.primas?.uf_10) || 0;
-                return (p3 + p5 + p10) === 0;
-            });
+
+        // Sólo llamar a Gemini si NO HUBO CACHÉ
+        if (!isCacheHit) {
+            // 2. Optimizar PDF si es necesario
+            const optimResult = await QuoteProcessingService.optimizePdf(req.file.path, pagesToKeep, req.user.id, loteId);
+            optimizedPath = optimResult.optimizedPath;
+
+            const pathForAI = optimizedPath || req.file.path;
+
+            // 3. Configuración IA
+            const aiConfig = await QuoteProcessingService.getAIConfiguration(req.user.id);
+
+            // 4. Llamada IA
+            quoteData = await QuoteProcessingService.processWithAI(pathForAI, req.file.originalname, aiConfig, selectedEmpresa);
+
+            // --- REINTENTO AUTOMÁTICO SI HAY VALORES EN 0 ---
+            if (!isCacheHit) {
+                if (quoteData && quoteData.comparativa_seguros && quoteData.comparativa_seguros.length > 0) {
+                    // Revisamos si alguna de las opciones arrojó $0 o UF 0 en todas sus primas
+                    isUfCero = quoteData.comparativa_seguros.some(opcion => {
+                        const p3 = parseFloat(opcion.primas?.uf_3) || 0;
+                        const p5 = parseFloat(opcion.primas?.uf_5) || 0;
+                        const p10 = parseFloat(opcion.primas?.uf_10) || 0;
+                        return (p3 + p5 + p10) === 0;
+                    });
+                }
+
+                if (isUfCero && String(pagesToKeep) !== "0") {
+                    console.log("🚨 ALERTA: La IA devolvió Prima UF = 0. Iniciando REINTENTO con documento completo...");
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+
+                    const retryOpt = await QuoteProcessingService.optimizePdf(req.file.path, "0", req.user.id, loteId);
+                    retryOptimizedPath = retryOpt.optimizedPath; // guardar para limpiar luego
+                    const retryPathForAI = retryOptimizedPath || req.file.path;
+
+                    // 3. Configuración IA ya se trajo arriba, reutilizamos
+                    const aiConfig = await QuoteProcessingService.getAIConfiguration(req.user.id);
+                    quoteData = await QuoteProcessingService.processWithAI(retryPathForAI, req.file.originalname, aiConfig, selectedEmpresa);
+                    console.log("✅ Reintento de IA finalizado.");
+                }
+            }
+            // --- FIN REINTENTO ---
+
+            // Determinar qué archivo físico existe para mover a final (fallback defensivo).
+            // En paralelo puede ocurrir que req.file.path ya no esté por limpieza de otra request.
+            let pathForFinal = req.file.path;
+            let finalRelativePath = null;
+
+            if (!isCacheHit) {
+                const candidatePaths = [req.file.path, retryOptimizedPath, optimizedPath].filter(Boolean);
+                pathForFinal = candidatePaths.find(p => fs.existsSync(p));
+
+                console.log(`📁 Candidatos para final:`);
+                candidatePaths.forEach(p => console.log(`   ${fs.existsSync(p) ? '✅' : '❌'} ${path.basename(p)}`))
+
+            }
+
+            // Mover archivo final para historial solo si no hubo caché. 
+            // Si hubo caché, file.path ya se borró al inicio, no nos preocupamos
+            finalRelativePath = await QuoteProcessingService.moveFileToFinal(pathForFinal, req.file.originalname, loteId, req.user.id);
+        } else {
+            // Emular un path final para que BD lo tome
+            finalRelativePath = 'cache_hit_' + req.file.originalname;
         }
-
-        if (isUfCero && String(pagesToKeep) !== "0") {
-            console.log("🚨 ALERTA: La IA devolvió Prima UF = 0. Iniciando REINTENTO con documento completo...");
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            const retryOpt = await QuoteProcessingService.optimizePdf(req.file.path, "0", req.user.id, loteId);
-            retryOptimizedPath = retryOpt.optimizedPath; // guardar para limpiar luego
-            const retryPathForAI = retryOptimizedPath || req.file.path;
-            quoteData = await QuoteProcessingService.processWithAI(retryPathForAI, req.file.originalname, aiConfig, selectedEmpresa);
-            console.log("✅ Reintento de IA finalizado.");
-        }
-        // --- FIN REINTENTO ---
-
-        // Determinar qué archivo físico existe para mover a final (fallback defensivo).
-        // En paralelo puede ocurrir que req.file.path ya no esté por limpieza de otra request.
-        const candidatePaths = [req.file.path, retryOptimizedPath, optimizedPath].filter(Boolean);
-        const pathForFinal = candidatePaths.find(p => fs.existsSync(p));
-
-        console.log(`📁 Candidatos para final:`);
-        candidatePaths.forEach(p => console.log(`   ${fs.existsSync(p) ? '✅' : '❌'} ${path.basename(p)}`))
-
-        if (!pathForFinal) {
-            throw new Error(`ENOENT preventivo: Ninguna copia del archivo existe antes de mover a final. Candidatos: ${candidatePaths.join(', ')}`);
-        }
-
-        // Mover archivo final para historial (Siempre)
-        const finalRelativePath = await QuoteProcessingService.moveFileToFinal(pathForFinal, req.file.originalname, loteId, req.user.id);
 
         // Limpieza SELECTIVA — Solo los archivos de ESTA request.
         // ⚠️ NO borramos el directorio completo porque en procesamiento paralelo todos
@@ -135,7 +178,8 @@ exports.processUpload = async (req, res) => {
         res.json({
             ...cotizacionCompleta.toJSON(),
             raw_ai_response: quoteData,
-            optimization_suggestion: optimizationSuggestion
+            optimization_suggestion: optimizationSuggestion,
+            _cache_hit: isCacheHit
         });
 
     } catch (error) {
