@@ -15,6 +15,7 @@ exports.processUpload = async (req, res) => {
         // --- CACHÉ POR MD5: Si el mismo PDF ya fue procesado recientemente, no llamar a Gemini ---
         let quoteData = null;
         let isCacheHit = false;
+        let cachedRutaArchivo = null;
 
         if (fileMd5) {
             try {
@@ -54,6 +55,9 @@ exports.processUpload = async (req, res) => {
                         }))
                     };
                     isCacheHit = true;
+                    if (cached.detalles && cached.detalles.length > 0) {
+                        cachedRutaArchivo = cached.detalles[0].rutaArchivo;
+                    }
 
                     // Limpiar el archivo subido temporario original
                     try { fs.unlinkSync(req.file.path); } catch (e) { /* ignorar */ }
@@ -136,8 +140,8 @@ exports.processUpload = async (req, res) => {
             // Si hubo caché, file.path ya se borró al inicio, no nos preocupamos
             finalRelativePath = await QuoteProcessingService.moveFileToFinal(pathForFinal, req.file.originalname, loteId, req.user.id);
         } else {
-            // Emular un path final para que BD lo tome
-            finalRelativePath = 'cache_hit_' + req.file.originalname;
+            // Reutilizar la ruta original del PDF guardado y cacheado
+            finalRelativePath = cachedRutaArchivo || ('cache_hit_' + req.file.originalname);
         }
 
         // Limpieza SELECTIVA — Solo los archivos de ESTA request.
