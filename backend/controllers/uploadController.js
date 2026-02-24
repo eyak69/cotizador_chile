@@ -26,8 +26,9 @@ exports.processUpload = async (req, res) => {
 
         // --- REINTENTO AUTOMÁTICO SI HAY VALORES EN 0 ---
         let isUfCero = false;
+        let retryOptimizedPath = null; // Guardamos para limpiar después
         if (quoteData && quoteData.comparativa_seguros && quoteData.comparativa_seguros.length > 0) {
-            // Revisamos si alguna de las opciones arrojó $0 o UF 0 en todas sus primas (lo que indica que la IA no encontró la tabla)
+            // Revisamos si alguna de las opciones arrojó $0 o UF 0 en todas sus primas
             isUfCero = quoteData.comparativa_seguros.some(opcion => {
                 const p3 = parseFloat(opcion.primas?.uf_3) || 0;
                 const p5 = parseFloat(opcion.primas?.uf_5) || 0;
@@ -37,20 +38,13 @@ exports.processUpload = async (req, res) => {
         }
 
         if (isUfCero && String(pagesToKeep) !== "0") {
-            console.log("🚨 ALERTA: La IA devolvió Prima UF = 0. Posible error de páginas cortadas. Iniciando REINTENTO con documento completo (páginas=0)...");
-
-            // Pequeño delay antes del reintento para evitar rate-limit (429) de Gemini en lotes múltiples
+            console.log("🚨 ALERTA: La IA devolvió Prima UF = 0. Iniciando REINTENTO con documento completo...");
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            // Re-optimizar con configuración "0" (Todo el documento)
-            // IMPORTANTE: req.file.path debe existir todavía. La limpieza de temporales
-            // se hace MÁS ABAJO, DESPUÉS de este bloque. (Bug Fix: antes estaba antes)
             const retryOpt = await QuoteProcessingService.optimizePdf(req.file.path, "0", req.user.id, loteId);
-            const retryPathForAI = retryOpt.optimizedPath || req.file.path;
-
-            // Segunda llamada a la IA con el documento extendido
+            retryOptimizedPath = retryOpt.optimizedPath; // guardar para limpiar luego
+            const retryPathForAI = retryOptimizedPath || req.file.path;
             quoteData = await QuoteProcessingService.processWithAI(retryPathForAI, req.file.originalname, aiConfig, selectedEmpresa);
-
             console.log("✅ Reintento de IA finalizado.");
         }
         // --- FIN REINTENTO ---
@@ -58,16 +52,20 @@ exports.processUpload = async (req, res) => {
         // Mover archivo final para historial (Siempre)
         const finalRelativePath = await QuoteProcessingService.moveFileToFinal(req.file.path, req.file.originalname, loteId, req.user.id);
 
-        // Limpieza de Temporales — se hace DESPUÉS del reintento para que req.file.path
-        // siga existiendo si fue necesario re-procesar el PDF completo (Bug Fix).
-        console.log("🧹 Limpiando toda la carpeta temporal de este lote incondicionalmente...");
-        const tempDir = path.join(__dirname, '..', '..', 'uploads', 'temp', String(req.user.id), String(loteId));
-        if (fs.existsSync(tempDir)) {
+        // Limpieza SELECTIVA — Solo los archivos de ESTA request.
+        // ⚠️ NO borramos el directorio completo porque en procesamiento paralelo todos
+        // los archivos del lote comparten el mismo tempDir. Borrar el dir eliminaría
+        // los PDFs de otros archivos que aún se están procesando.
+        console.log("🧹 Limpiando archivos temporales de esta request...");
+        const filesToClean = [req.file.path, optimizedPath, retryOptimizedPath].filter(Boolean);
+        for (const filePath of [...new Set(filesToClean)]) {
             try {
-                fs.rmSync(tempDir, { recursive: true, force: true });
-                console.log(`Carpeta temporal eliminada: ${tempDir}`);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                    console.log(`  ✓ Eliminado: ${path.basename(filePath)}`);
+                }
             } catch (err) {
-                console.error(`Error borrando carpeta temp ${tempDir}:`, err.message);
+                console.error(`  ✗ Error borrando ${path.basename(filePath)}:`, err.message);
             }
         }
 
