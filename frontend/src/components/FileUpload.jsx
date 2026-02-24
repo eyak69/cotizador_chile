@@ -50,9 +50,19 @@ const FileUpload = ({ onQuoteProcessed }) => {
     const [fileToDelete, setFileToDelete] = useState(null);
 
     React.useEffect(() => {
-        api.get('/empresas')
-            .then(res => setCompanies(res.data))
-            .catch(err => console.error("Error cargando empresas:", err));
+        let attempts = 0;
+        const fetchEmpresas = () => {
+            api.get('/empresas')
+                .then(res => setCompanies(res.data))
+                .catch(err => {
+                    console.error("Error cargando empresas:", err.message);
+                    if (attempts < 5) {
+                        attempts++;
+                        setTimeout(fetchEmpresas, 1500 * attempts); // Reintento escalonado
+                    }
+                });
+        };
+        fetchEmpresas();
 
         // Cargar estado DEBUG (Opcional, desactivado para evitar 404 si no existe endpoint)
         // api.get('/parametros')...
