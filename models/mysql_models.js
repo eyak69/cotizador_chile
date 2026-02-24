@@ -6,7 +6,6 @@ const Cotizacion = sequelize.define('Cotizacion', {
   vehiculo: { type: DataTypes.STRING, allowNull: true },
   rutaArchivo: { type: DataTypes.STRING, allowNull: true },
   loteId: { type: DataTypes.STRING, allowNull: true },
-  file_md5: { type: DataTypes.STRING(32), allowNull: true },   // Hash MD5 del PDF — usado para caché
   userId: { type: DataTypes.INTEGER, allowNull: true }         // FK al propietario
 }, { tableName: 'cotizacions' });
 
@@ -26,7 +25,8 @@ const DetalleCotizacion = sequelize.define('DetalleCotizacion', {
   reposicion_meses: { type: DataTypes.STRING },
   paginas_encontradas: { type: DataTypes.STRING },
   observaciones: { type: DataTypes.TEXT },
-  rutaArchivo: { type: DataTypes.STRING }
+  rutaArchivo: { type: DataTypes.STRING },
+  file_md5: { type: DataTypes.STRING(32), allowNull: true } // Hash MD5 del archivo original
   // userId no necesario: hereda ownership a través de Cotizacion
 }, { tableName: 'detallecotizacions' });
 

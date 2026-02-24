@@ -196,16 +196,11 @@ class QuoteProcessingService {
             if (!nuevaCotizacion.asegurado && quoteData.asegurado) {
                 await nuevaCotizacion.update({ asegurado: quoteData.asegurado, vehiculo: quoteData.vehiculo });
             }
-            // Actualizar MD5 si aun no está guardado en este lote
-            if (fileMd5 && !nuevaCotizacion.file_md5) {
-                await nuevaCotizacion.update({ file_md5: fileMd5 });
-            }
         } else {
             nuevaCotizacion = await Cotizacion.create({
                 asegurado: quoteData.asegurado,
                 vehiculo: quoteData.vehiculo,
                 loteId: loteId,
-                file_md5: fileMd5 || null,
                 userId: userId || null
             });
         }
@@ -224,10 +219,8 @@ class QuoteProcessingService {
                 observaciones: typeof c.caracteristicas?.otros_beneficios === 'object' ? JSON.stringify(c.caracteristicas.otros_beneficios) : (c.caracteristicas?.otros_beneficios || null),
                 CotizacionId: nuevaCotizacion.id,
                 empresa_id: selectedEmpresa ? selectedEmpresa.id : null,
-                // Y al final en saveQuoteToDB
-                CotizacionId: nuevaCotizacion.id,
-                empresa_id: selectedEmpresa ? selectedEmpresa.id : null,
-                rutaArchivo: finalFileName
+                rutaArchivo: finalFileName,
+                file_md5: fileMd5 || null
             }));
 
             const detallesAInsertar = [];

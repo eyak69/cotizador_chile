@@ -17,8 +17,12 @@ exports.processUpload = async (req, res) => {
             try {
                 const hace72h = new Date(Date.now() - 72 * 60 * 60 * 1000);
                 const cached = await Cotizacion.findOne({
-                    where: { file_md5: fileMd5, userId: req.user.id },
-                    include: [{ model: DetalleCotizacion, as: 'detalles' }],
+                    where: { userId: req.user.id },
+                    include: [{
+                        model: DetalleCotizacion,
+                        as: 'detalles',
+                        where: { file_md5: fileMd5 }
+                    }],
                     order: [['createdAt', 'DESC']]
                 });
 
