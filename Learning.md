@@ -248,3 +248,85 @@ if (index > 0) await new Promise(r => setTimeout(r, index * 2000));
 
 Cuando `pagesConfig="0"` (leer todo el documento), `optimizePdf` detecta que `pageIndices.length === pageCount`, por lo que NO crea un nuevo archivo (wasOptimized=false) y retorna `optimizedPath = filePath` (el mismo `req.file.path`). Esto significa que `retryOptimizedPath` puede apuntar al MISMO archivo que `req.file.path`. Usar `new Set()` al limpiar evita borrar dos veces el mismo archivo.
 
+**Fix adicional (forceCreate):** Se agregó `const forceCreate = configStr === '0'` para que cuando el reintento llama a `optimizePdf` con pagesConfig="0", SIEMPRE se crea un archivo `opt_` separado, evitando que `retryOptimizedPath === req.file.path` y garantizando que el original siga disponible para `moveFileToFinal`.
+
+## 2026-02-24 - UX: Progreso en Tiempo Real y Optimización de Tokens Gemini
+
+### UX: Indicadores de Progreso en Tiempo Real (FileUpload.jsx)
+
+Se implementaron múltiples indicadores visuales para el procesamiento paralelo de PDFs:
+
+- **Cronómetro en vivo**: `useEffect` con `setInterval` de 1 segundo mientras `loading=true`. Muestra el tiempo en formato `MM:SS` en el Backdrop.
+- **Contador progresivo**: Estado `completedCount` que se incrementa en `processOneFile` al finalizar cada archivo. Se muestra con `LinearProgress` deterministic: `value={(completedCount / files.length) * 100}`.
+- **Tiempo por archivo**: Estado `fileTimings[md5]` guardado al final de `processOneFile`. Los chips de estado muestran `Listo (12s)` en verde.
+- **Banner de resumen final**: Estado `completionStats` con `realTime`, `seqEstimate` (suma de tiempos individuales) y `saving`. Muestra un badge púrpura `⚡ Ns ahorrados` cuando el ahorro es > 2 segundos.
+
+```js
+// Cronómetro con cleanup correcto
+useEffect(() => {
+    if (loading && processingStart) {
+        timerRef.current = setInterval(() => {
+            setElapsedSeconds(Math.floor((Date.now() - processingStart) / 1000));
+        }, 1000);
+    } else {
+        clearInterval(timerRef.current);
+    }
+    return () => clearInterval(timerRef.current);
+}, [loading, processingStart]);
+```
+
+**Lección:** Siempre usar `useRef` para el intervalo en lugar de `useState` para el ID del intervalo, ya que el ref no causa re-renders innecesarios.
+
+### Bug: finalQuoteRecord con el resultado equivocado
+
+**Problema:** Al procesar 3 archivos en paralelo, `finalQuoteRecord` se sobreescribía por orden del array (ANS=0, SURA=1, HDI=2) y el último (HDI) podía tener menos detalles que el primero (ANS con 8 empresas).
+
+**Causa raíz:** El archivo que termina más rápido (HDI, 60KB) responde desde DB antes de que los demás hayan guardado sus detalles. Su `findByPk` ve el menor número de detalles.
+
+**Fix:** Comparar cuántos `detalles` tiene cada resultado y quedarse con el que más tiene:
+```js
+const currentDetalles = data.detalles?.length ?? 0;
+const prevDetalles = finalQuoteRecord?.detalles?.length ?? 0;
+if (currentDetalles >= prevDetalles) finalQuoteRecord = data;
+```
+
+### Optimización de Tokens Gemini: 3 estrategias
+
+#### 1. Caché MD5 en Backend (Mayor ahorro — 100% de tokens en resubidas)
+
+- Se agrega campo `file_md5 VARCHAR(32)` al modelo `Cotizacion` (Sequelize lo crea automáticamente con `alter:true`).
+- Frontend calcula el MD5 del archivo (ya lo tenía con `spark-md5`) y lo envía en el header `x-file-md5`.
+- Backend busca en DB una `Cotizacion` con el mismo `file_md5` y `userId` creada en las últimas 72 horas.
+- Si existe y tiene detalles, responde inmediatamente sin llamar a Gemini (`_cache_hit: true`).
+
+```js
+const cached = await Cotizacion.findOne({
+    where: { file_md5: fileMd5, userId: req.user.id },
+    include: [{ model: DetalleCotizacion, as: 'detalles' }],
+    order: [['createdAt', 'DESC']]
+});
+if (cached && cached.detalles.length > 0 && new Date(cached.createdAt) > hace72h) {
+    return res.json({ ...cached.toJSON(), _cache_hit: true });
+}
+```
+
+#### 2. Reglas de corrección filtradas por empresa
+
+Antes: se cargaban las `CorrectionRule` de TODAS las empresas y se inyectaban al prompt.
+Ahora: se filtra con `WHERE EmpresaId = config.companyId` cuando hay empresa específica identificada.
+**Ahorro:** Proporcional a la cantidad de empresas y reglas configuradas.
+
+#### 3. Prompt más conciso
+
+- Eliminada la línea duplicada: `INSTRUCCIONES ESPECÍFICAS POR EMPRESA (Prioridad Máxima)` aparecía dos veces.
+- Introducción del prompt reducida de 2 oraciones detalladas a 1 más concisa.
+- **Ahorro:** ~50-100 tokens por llamada.
+
+### Patrón: Evitar enviar más contexto del necesario a LLMs
+
+Regla general para minimizar costos con Gemini u otros LLMs:
+1. **Filtrar datos por contexto** — no cargar toda la DB si solo se necesita una empresa
+2. **Caché por hash** — calcular MD5 del input y evitar llamadas duplicadas
+3. **Revisar duplicados en prompts** — strings repetidos aumentan tokens innecesariamente
+4. **Recortar páginas del PDF** — ya implementado con `optimizePdf` (pagesToKeep)
+
