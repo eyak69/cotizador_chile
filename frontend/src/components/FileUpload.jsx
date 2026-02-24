@@ -256,12 +256,13 @@ const FileUpload = ({ onQuoteProcessed }) => {
 
             const allFailed = results.every(r => r.status === 'rejected');
             if (allFailed) {
+                onQuoteProcessed(null); // limpiar tabla anterior
                 setError('Todos los archivos fallaron. Revisa el debugger abajo 👇');
             } else {
                 console.log("Resultados Finales:", finalQuoteRecord);
                 setDebugData(combinedDebug);
-                onQuoteProcessed(finalQuoteRecord);
-                // Solo limpiar archivos exitosos
+                onQuoteProcessed(finalQuoteRecord ?? null);
+                // Solo mantener archivos que fallaron (para reintentar)
                 const failedIndices = new Set(results.map((r, i) => r.status === 'rejected' ? i : -1).filter(i => i >= 0));
                 setFiles(prev => prev.filter((_, i) => failedIndices.has(i)));
             }
@@ -273,6 +274,8 @@ const FileUpload = ({ onQuoteProcessed }) => {
             setError('Hubo un error al procesar. Revisa el debugger abajo 👇');
         } finally {
             setLoading(false);
+            // Resetear progreso visual para no mostrar estados viejos en la próxima carga
+            setFileProgress({});
         }
     };
 

@@ -96,8 +96,10 @@ class QuoteProcessingService {
             }
         }
 
-        // Si tenemos índices seleccionados y son menos que el total (o si es selección específica forzamos optimización)
-        if (pageIndices.length > 0 && (pageIndices.length < pageCount || configStr.includes(','))) {
+        // Si tenemos índices seleccionados y son menos que el total (o es selección específica o ALL-pages forzado)
+        // IMPORTANTE: Siempre crear archivo separado para evitar que limpieza paralela borre el original
+        const forceCreate = configStr === '0'; // Para reintento completo, siempre crear copia separada
+        if (pageIndices.length > 0 && (pageIndices.length < pageCount || configStr.includes(',') || forceCreate)) {
             console.log(`✂️ Creando PDF optimizado con ${pageIndices.length} páginas seleccionadas.`);
             const newPdf = await PDFDocument.create();
             const pages = await newPdf.copyPages(pdfDoc, pageIndices);
