@@ -79,6 +79,7 @@ exports.processUpload = async (req, res) => {
         let optimizedPath = null;
         let retryOptimizedPath = null;
         let isUfCero = false;
+        let finalRelativePath = null; // Declarada en el scope principal de la función
 
         // Sólo llamar a Gemini si NO HUBO CACHÉ
         if (!isCacheHit) {
@@ -95,45 +96,40 @@ exports.processUpload = async (req, res) => {
             quoteData = await QuoteProcessingService.processWithAI(pathForAI, req.file.originalname, aiConfig, selectedEmpresa);
 
             // --- REINTENTO AUTOMÁTICO SI HAY VALORES EN 0 ---
-            if (!isCacheHit) {
-                if (quoteData && quoteData.comparativa_seguros && quoteData.comparativa_seguros.length > 0) {
-                    // Revisamos si alguna de las opciones arrojó $0 o UF 0 en todas sus primas
-                    isUfCero = quoteData.comparativa_seguros.some(opcion => {
-                        const p3 = parseFloat(opcion.primas?.uf_3) || 0;
-                        const p5 = parseFloat(opcion.primas?.uf_5) || 0;
-                        const p10 = parseFloat(opcion.primas?.uf_10) || 0;
-                        return (p3 + p5 + p10) === 0;
-                    });
-                }
+            if (quoteData && quoteData.comparativa_seguros && quoteData.comparativa_seguros.length > 0) {
+                // Revisamos si alguna de las opciones arrojó $0 o UF 0 en todas sus primas
+                isUfCero = quoteData.comparativa_seguros.some(opcion => {
+                    const p3 = parseFloat(opcion.primas?.uf_3) || 0;
+                    const p5 = parseFloat(opcion.primas?.uf_5) || 0;
+                    const p10 = parseFloat(opcion.primas?.uf_10) || 0;
+                    return (p3 + p5 + p10) === 0;
+                });
+            }
 
-                if (isUfCero && String(pagesToKeep) !== "0") {
-                    console.log("🚨 ALERTA: La IA devolvió Prima UF = 0. Iniciando REINTENTO con documento completo...");
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+            if (isUfCero && String(pagesToKeep) !== "0") {
+                console.log("🚨 ALERTA: La IA devolvió Prima UF = 0. Iniciando REINTENTO con documento completo...");
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
-                    const retryOpt = await QuoteProcessingService.optimizePdf(req.file.path, "0", req.user.id, loteId);
-                    retryOptimizedPath = retryOpt.optimizedPath; // guardar para limpiar luego
-                    const retryPathForAI = retryOptimizedPath || req.file.path;
+                const retryOpt = await QuoteProcessingService.optimizePdf(req.file.path, "0", req.user.id, loteId);
+                retryOptimizedPath = retryOpt.optimizedPath; // guardar para limpiar luego
+                const retryPathForAI = retryOptimizedPath || req.file.path;
 
-                    // 3. Configuración IA ya se trajo arriba, reutilizamos
-                    const aiConfig = await QuoteProcessingService.getAIConfiguration(req.user.id);
-                    quoteData = await QuoteProcessingService.processWithAI(retryPathForAI, req.file.originalname, aiConfig, selectedEmpresa);
-                    console.log("✅ Reintento de IA finalizado.");
-                }
+                // 3. Configuración IA ya se trajo arriba, reutilizamos
+                quoteData = await QuoteProcessingService.processWithAI(retryPathForAI, req.file.originalname, aiConfig, selectedEmpresa);
+                console.log("✅ Reintento de IA finalizado.");
             }
             // --- FIN REINTENTO ---
 
             // Determinar qué archivo físico existe para mover a final (fallback defensivo).
             // En paralelo puede ocurrir que req.file.path ya no esté por limpieza de otra request.
-            let pathForFinal = req.file.path;
-            let finalRelativePath = null;
+            const candidatePaths = [req.file.path, retryOptimizedPath, optimizedPath].filter(Boolean);
+            const pathForFinal = candidatePaths.find(p => fs.existsSync(p));
 
-            if (!isCacheHit) {
-                const candidatePaths = [req.file.path, retryOptimizedPath, optimizedPath].filter(Boolean);
-                pathForFinal = candidatePaths.find(p => fs.existsSync(p));
+            console.log(`📁 Candidatos para final:`);
+            candidatePaths.forEach(p => console.log(`   ${fs.existsSync(p) ? '✅' : '❌'} ${path.basename(p)}`))
 
-                console.log(`📁 Candidatos para final:`);
-                candidatePaths.forEach(p => console.log(`   ${fs.existsSync(p) ? '✅' : '❌'} ${path.basename(p)}`))
-
+            if (!pathForFinal) {
+                throw new Error(`ENOENT preventivo: Ninguna copia del archivo existe antes de mover a final. Candidatos: ${candidatePaths.join(', ')}`);
             }
 
             // Mover archivo final para historial solo si no hubo caché. 
