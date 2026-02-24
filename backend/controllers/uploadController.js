@@ -49,8 +49,20 @@ exports.processUpload = async (req, res) => {
         }
         // --- FIN REINTENTO ---
 
+        // Determinar qué archivo físico existe para mover a final (fallback defensivo).
+        // En paralelo puede ocurrir que req.file.path ya no esté por limpieza de otra request.
+        const candidatePaths = [req.file.path, retryOptimizedPath, optimizedPath].filter(Boolean);
+        const pathForFinal = candidatePaths.find(p => fs.existsSync(p));
+
+        console.log(`📁 Candidatos para final:`);
+        candidatePaths.forEach(p => console.log(`   ${fs.existsSync(p) ? '✅' : '❌'} ${path.basename(p)}`))
+
+        if (!pathForFinal) {
+            throw new Error(`ENOENT preventivo: Ninguna copia del archivo existe antes de mover a final. Candidatos: ${candidatePaths.join(', ')}`);
+        }
+
         // Mover archivo final para historial (Siempre)
-        const finalRelativePath = await QuoteProcessingService.moveFileToFinal(req.file.path, req.file.originalname, loteId, req.user.id);
+        const finalRelativePath = await QuoteProcessingService.moveFileToFinal(pathForFinal, req.file.originalname, loteId, req.user.id);
 
         // Limpieza SELECTIVA — Solo los archivos de ESTA request.
         // ⚠️ NO borramos el directorio completo porque en procesamiento paralelo todos
