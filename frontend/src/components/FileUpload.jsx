@@ -238,14 +238,24 @@ const FileUpload = ({ onQuoteProcessed }) => {
                     if (data.optimization_suggestion && !firstSuggestion) {
                         firstSuggestion = data.optimization_suggestion;
                     }
-                    finalQuoteRecord = data;
+                    // Elegir el record con MAS detalles (no simplemente el último del array)
+                    // El último en guardar en DB tiene todos los detalles acumulados del lote
+                    const currentDetalles = data.detalles?.length ?? 0;
+                    const prevDetalles = finalQuoteRecord?.detalles?.length ?? 0;
+                    if (currentDetalles >= prevDetalles) {
+                        finalQuoteRecord = data;
+                    }
                 } else {
                     // Marcar como error el archivo que falló
-                    console.error('❌ Error en archivo del lote:', result.reason);
-                    // Buscar qué md5 falló (por índice en results)
                     const idx = results.indexOf(result);
-                    const failedMd5 = files[idx]?.md5;
+                    const failedFile = files[idx];
+                    const failedMd5 = failedFile?.md5;
+                    const errorMsg = result.reason?.response?.data?.error || result.reason?.message || 'Error desconocido';
+                    console.error(`❌ Error en [${failedFile?.file?.name}]:`, result.reason);
                     if (failedMd5) setFileProgress(prev => ({ ...prev, [failedMd5]: 'error' }));
+                    // Mostrar toast con el error específico
+                    setToastMsg(`❌ ${failedFile?.file?.name ?? 'Archivo'}: ${errorMsg}`);
+                    setToastOpen(true);
                 }
             }
 
